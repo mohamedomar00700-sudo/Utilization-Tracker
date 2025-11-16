@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Utilization Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #283593; /* Deep Indigo */
+            --accent-color: #00BFA6;  /* Vibrant Teal */
+            --warning-color: #FFB300; /* Amber */
+            --danger-color: #E53935;  /* Coral/Red */
+            --success-color: #43A047; /* Green */
+            --bg-color: #F7F9FC;      /* Off-white */
+            --card-bg-color: #FFFFFF;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --border-color: #E0E0E0;
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #root {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>
