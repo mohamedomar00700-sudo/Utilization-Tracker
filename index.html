@@ -11,16 +11,35 @@
     <style>
         :root {
             --primary-color: #283593; /* Deep Indigo */
-            --accent-color: #00BFA6;  /* Vibrant Teal */
+            --accent-color: #283593;  /* Vibrant Teal - Now matches primary by default */
             --warning-color: #FFB300; /* Amber */
             --danger-color: #E53935;  /* Coral/Red */
             --success-color: #43A047; /* Green */
+
             --bg-color: #F7F9FC;      /* Off-white */
             --card-bg-color: #FFFFFF;
             --text-primary: #212121;
             --text-secondary: #757575;
             --border-color: #E0E0E0;
+
+            --animation-speed: 0.3s;
+            --bottom-nav-height: 60px;
         }
+
+        body.dark-mode {
+            --primary-color: #9FA8DA;
+            --accent-color: #9FA8DA;
+            --warning-color: #FFD54F;
+            --danger-color: #EF9A9A;
+            --success-color: #A5D6A7;
+            
+            --bg-color: #121212;
+            --card-bg-color: #1E1E1E;
+            --text-primary: #E0E0E0;
+            --text-secondary: #BDBDBD;
+            --border-color: #424242;
+        }
+
         body {
             margin: 0;
             font-family: 'Inter', sans-serif;
@@ -29,6 +48,7 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
+            transition: background-color var(--animation-speed) ease, color var(--animation-speed) ease;
         }
         #root {
             display: flex;

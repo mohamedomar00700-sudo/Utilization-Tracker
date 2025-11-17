@@ -18,7 +18,8 @@ const GlobalStyles = `
         padding: 24px;
         display: flex;
         flex-direction: column;
-        transition: margin-left 0.3s ease-in-out;
+        transition: margin-left var(--animation-speed) ease-in-out, background-color var(--animation-speed) ease;
+        z-index: 1000;
     }
     .sidebar.collapsed {
         margin-left: calc(-1 * var(--sidebar-width));
@@ -61,6 +62,7 @@ const GlobalStyles = `
         padding: 32px;
         overflow-y: auto;
         position: relative;
+        transition: padding-left var(--animation-speed) ease-in-out;
     }
      .sidebar-toggle {
         position: fixed;
@@ -77,16 +79,20 @@ const GlobalStyles = `
         justify-content: center;
         cursor: pointer;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: background-color var(--animation-speed) ease, border-color var(--animation-speed) ease;
     }
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
     }
     .header h1 {
         margin: 0;
         font-size: 28px;
+        transition: margin-left var(--animation-speed) ease-in-out;
     }
     .header-actions {
         display: flex;
@@ -95,7 +101,7 @@ const GlobalStyles = `
     }
     .user-switcher { display: flex; align-items: center; gap: 8px; }
     .user-switcher label { font-weight: 600; font-size: 14px; }
-    .user-switcher select { padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); }
+    .user-switcher select { padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg-color); color: var(--text-primary); }
 
     .btn {
         padding: 10px 18px;
@@ -107,7 +113,7 @@ const GlobalStyles = `
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        transition: opacity 0.2s;
+        transition: opacity 0.2s, background-color 0.2s;
     }
     .btn:hover {
         opacity: 0.9;
@@ -132,11 +138,11 @@ const GlobalStyles = `
     }
     .dashboard-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 2fr 1fr;
         gap: 24px;
         align-items: start;
     }
-    @media (max-width: 992px) {
+    @media (max-width: 1200px) {
         .dashboard-grid {
             grid-template-columns: 1fr;
         }
@@ -147,6 +153,7 @@ const GlobalStyles = `
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         border: 1px solid var(--border-color);
+        transition: background-color var(--animation-speed) ease, border-color var(--animation-speed) ease;
     }
     .card h3 {
         margin: 0 0 8px 0;
@@ -195,6 +202,8 @@ const GlobalStyles = `
         border-radius: 6px;
         border: 1px solid var(--border-color);
         min-width: 150px;
+        background-color: var(--card-bg-color);
+        color: var(--text-primary);
     }
     .page-actions {
         display: flex;
@@ -212,6 +221,7 @@ const GlobalStyles = `
         padding: 16px;
         text-align: left;
         border-bottom: 1px solid var(--border-color);
+        transition: background-color var(--animation-speed) ease, border-color var(--animation-speed) ease;
     }
     th {
         font-size: 12px;
@@ -229,19 +239,23 @@ const GlobalStyles = `
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0,0,0,0.5);
+        background-color: rgba(0,0,0,0.6);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 1000;
+        animation: fade-in var(--animation-speed) ease;
     }
     .modal-content {
-        background: white;
+        background: var(--card-bg-color);
         padding: 32px;
         border-radius: 8px;
         width: 100%;
         max-width: 600px;
+        animation: slide-up var(--animation-speed) ease;
     }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .modal-header {
         display: flex;
         justify-content: space-between;
@@ -263,6 +277,8 @@ const GlobalStyles = `
         border: 1px solid var(--border-color);
         font-size: 14px;
         font-family: inherit;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
     }
     .modal-actions {
         display: flex;
@@ -279,9 +295,12 @@ const GlobalStyles = `
         display: flex;
         align-items: center;
         justify-content: center;
+        color: var(--text-secondary);
+        transition: background-color 0.2s, color 0.2s;
     }
     .btn-icon:hover {
         background: var(--bg-color);
+        color: var(--text-primary);
     }
     .loading-overlay {
         position: absolute;
@@ -289,12 +308,13 @@ const GlobalStyles = `
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(255, 255, 255, 0.8);
+        background: rgba(0, 0, 0, 0.5);
         display: flex;
         justify-content: center;
         align-items: center;
         font-size: 1.2rem;
         z-index: 999;
+        color: white;
     }
     .status-tag {
         padding: 4px 12px;
@@ -305,11 +325,11 @@ const GlobalStyles = `
         text-align: center;
         min-width: 100px;
     }
-    .status-overloaded { background-color: #FFF0F0; color: var(--danger-color); }
-    .status-healthy { background-color: #E8F5E9; color: var(--success-color); }
-    .status-underutilized { background-color: #FFFDE7; color: var(--warning-color); }
+    .status-overloaded { background-color: var(--danger-color); color: white; }
+    .status-healthy { background-color: var(--success-color); color: white; }
+    .status-underutilized { background-color: var(--warning-color); color: white; }
     
-    .utilization-bar-container { width: 100%; max-width: 120px; height: 8px; background-color: #e0e0e0; border-radius: 4px; overflow: hidden; }
+    .utilization-bar-container { width: 100%; max-width: 120px; height: 8px; background-color: var(--border-color); border-radius: 4px; overflow: hidden; }
     .utilization-bar { height: 100%; border-radius: 4px; transition: width 0.3s ease-in-out; }
     
     th.sortable { cursor: pointer; position: relative; }
@@ -322,15 +342,33 @@ const GlobalStyles = `
     .toast-error { background-color: var(--danger-color); }
     @keyframes toast-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    .chart-container { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 16px 0; }
+    .chart-container { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 16px 0; flex-wrap: wrap; }
     .chart-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
     .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
     .legend-color { width: 14px; height: 14px; border-radius: 4px; }
 
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background-color: var(--bg-color); }
+
+    .empty-state {
+        text-align: center;
+        padding: 48px;
+        color: var(--text-secondary);
+    }
+    .empty-state .material-icons {
+        font-size: 64px;
+        margin-bottom: 16px;
+        color: var(--border-color);
+    }
+    .empty-state h3 {
+        font-size: 20px;
+        color: var(--text-primary);
+        margin: 0 0 8px 0;
+    }
+    .empty-state p { margin: 0 0 24px 0; }
     
     /* My Day View Styles */
+    .my-day-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
     .my-day-view { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
     @media (min-width: 992px) {
         .my-day-view { grid-template-columns: 3fr 2fr; }
@@ -341,6 +379,7 @@ const GlobalStyles = `
         height: 540px; /* 9 hours * 60px/hr */ 
         border-left: 2px solid var(--border-color);
         margin-left: 10px; /* Align border */
+        user-select: none;
     }
     .timeline-hour-marker { 
         position: absolute; 
@@ -351,6 +390,7 @@ const GlobalStyles = `
         font-size: 12px; 
         color: var(--text-secondary); 
         transform: translateY(-50%); /* Center align with the line */
+        pointer-events: none;
     }
     .timeline-event { 
         position: absolute; 
@@ -363,14 +403,32 @@ const GlobalStyles = `
         border-left: 4px solid var(--accent-color); 
         overflow: hidden; 
         z-index: 10;
+        cursor: grab;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    .timeline-event.is-dragging {
+        opacity: 0.7;
+        z-index: 20;
+        cursor: grabbing;
     }
     .timeline-event.is-break {
-        background: #E3F2FD;
-        color: #1E88E5;
-        border-left-color: #90CAF9;
+        background: #607D8B;
+        color: white;
+        border-left-color: #90A4AE;
     }
-    .timeline-event strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .timeline-event strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
     .timeline-event span { font-size: 12px; opacity: 0.8; }
+
+    .resize-handle {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 8px;
+        cursor: ns-resize;
+        z-index: 15;
+    }
+    .resize-handle.top { top: -4px; }
+    .resize-handle.bottom { bottom: -4px; }
 
     .timeline-gap {
         all: unset; /* Reset button styles */
@@ -395,26 +453,93 @@ const GlobalStyles = `
         font-family: inherit;
     }
     .timeline-gap:hover {
-        background-color: #E8F5E9;
+        background-color: var(--success-color);
+        opacity: 0.2;
         border-color: var(--success-color);
         color: var(--success-color);
     }
-    .timeline-gap .material-icons {
-        font-size: 18px;
-    }
+    .timeline-gap .material-icons { font-size: 18px; }
+    .timeline-gap-timer { font-size: 14px; font-weight: 700; color: var(--accent-color); }
+    .timeline-gap button { margin-top: 4px; }
 
     .activity-list ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-    .activity-item { background: var(--card-bg-color); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .activity-item { background: var(--bg-color); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
     .activity-item-info { display: flex; flex-direction: column; gap: 4px; }
     .activity-item-info .title { font-weight: 600; }
     .activity-item-info .meta { font-size: 14px; color: var(--text-secondary); }
     .activity-item-info .notes { font-size: 14px; color: var(--text-primary); margin-top: 4px; font-style: italic; }
+
+    /* Week View */
+    .week-view-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .week-day-column { background-color: var(--bg-color); border-radius: 8px; padding: 8px; }
+    .week-day-header { text-align: center; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+    .week-day-timeline { position: relative; height: 400px; }
+    .week-event { position: absolute; width: 100%; background-color: var(--primary-color); border-radius: 3px; font-size: 10px; color: white; padding: 2px 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    /* Bottom Nav for Mobile */
+    .bottom-nav {
+        display: none; /* Hidden by default */
+    }
+    @media (max-width: 768px) {
+        .sidebar, .sidebar-toggle { display: none; }
+        .main-content { padding: 16px; padding-bottom: calc(var(--bottom-nav-height) + 16px); }
+        .header h1 { margin-left: 0 !important; font-size: 24px; }
+        .dashboard-grid { grid-template-columns: 1fr; }
+        .bottom-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: var(--bottom-nav-height);
+            background-color: var(--card-bg-color);
+            border-top: 1px solid var(--border-color);
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1200;
+        }
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .bottom-nav-item.active { color: var(--primary-color); }
+    }
+
+    /* Theme settings */
+    .theme-settings-popover {
+        position: absolute;
+        background-color: var(--card-bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        padding: 16px;
+        z-index: 1200;
+        right: 0;
+    }
+    .theme-colors { display: flex; gap: 10px; margin-top: 8px; }
+    .theme-color-swatch {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    .theme-color-swatch.active {
+        border-color: var(--text-primary);
+    }
 `;
 
 // --- TYPES ---
 type Page = 'dashboard' | 'myday' | 'timelogs' | 'tasks' | 'employees' | 'workload';
 type ToastType = 'success' | 'error';
 type TaskStatus = 'Not Started' | 'In Progress' | 'Completed';
+type Theme = 'light' | 'dark';
 
 interface Toast {
     id: number;
@@ -450,10 +575,8 @@ interface TimeLog {
 const calculateDuration = (startTime: string, endTime: string): number => {
     if (!startTime || !endTime) return 0;
     try {
-        const [startH, startM] = startTime.split(':').map(Number);
-        const [endH, endM] = endTime.split(':').map(Number);
-        const startMinutes = startH * 60 + startM;
-        const endMinutes = endH * 60 + endM;
+        const startMinutes = timeToMinutes(startTime);
+        const endMinutes = timeToMinutes(endTime);
         if (isNaN(startMinutes) || isNaN(endMinutes) || endMinutes < startMinutes) return 0;
         return (endMinutes - startMinutes) / 60;
     } catch {
@@ -467,6 +590,34 @@ const timeToMinutes = (time: string) => {
     return h * 60 + m;
 };
 
+const minutesToTime = (mins: number) => {
+    const h = Math.floor(mins / 60).toString().padStart(2, '0');
+    const m = (mins % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+};
+
+const useLocalStorage = (key, initialValue) => {
+    const [storedValue, setStoredValue] = useState(() => {
+        try {
+            const item = window.localStorage.getItem(key);
+            return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+            console.log(error);
+            return initialValue;
+        }
+    });
+
+    const setValue = (value) => {
+        try {
+            const valueToStore = value instanceof Function ? value(storedValue) : value;
+            setStoredValue(valueToStore);
+            window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        } catch (error) {
+            console.log(error);
+        }
+    };
+    return [storedValue, setValue];
+};
 
 // --- REUSABLE COMPONENTS ---
 
@@ -564,8 +715,64 @@ const DonutChart = ({ data, colors }) => {
     );
 };
 
+const BarChart = ({ data, colors }) => {
+    const chartHeight = 220;
+    const chartWidth = 350;
+    const barGap = 10;
+    const maxValue = Math.max(...data.map(d => d.value), 1);
+    const barWidth = (chartWidth - (data.length - 1) * barGap) / data.length;
+
+    return (
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
+                <g>
+                    {data.map((item, index) => {
+                        const barHeight = (item.value / maxValue) * (chartHeight - 30);
+                        const x = index * (barWidth + barGap);
+                        const y = chartHeight - barHeight - 20;
+                        return (
+                            <g key={index}>
+                                <rect
+                                    x={x}
+                                    y={y}
+                                    width={barWidth}
+                                    height={barHeight}
+                                    fill={colors[index % colors.length]}
+                                    rx="4"
+                                />
+                                <text x={x + barWidth / 2} y={chartHeight - 5} textAnchor="middle" fontSize="12" fill="var(--text-secondary)">
+                                    {item.label}
+                                </text>
+                                <text x={x + barWidth / 2} y={y - 5} textAnchor="middle" fontSize="12" fill="var(--text-primary)" fontWeight="bold">
+                                    {item.value}h
+                                </text>
+                            </g>
+                        );
+                    })}
+                </g>
+            </svg>
+        </div>
+    );
+};
+
+const EmptyState = ({ icon, title, message, action }) => (
+    <div className="empty-state">
+        <span className="material-icons">{icon}</span>
+        <h3>{title}</h3>
+        <p>{message}</p>
+        {action}
+    </div>
+);
+
 const NavItem = ({ icon, label, active, onClick }) => (
     <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
+        <span className="material-icons">{icon}</span>
+        <span>{label}</span>
+    </div>
+);
+
+const BottomNavItem = ({ icon, label, active, onClick }) => (
+    <div className={`bottom-nav-item ${active ? 'active' : ''}`} onClick={onClick}>
         <span className="material-icons">{icon}</span>
         <span>{label}</span>
     </div>
@@ -615,12 +822,24 @@ const DashboardView = ({ employees, timeLogs, teams, filters, setFilters }) => {
         };
     }, [filteredEmployees, filteredTimeLogs]);
 
-    const chartData = [
+    const teamHoursData = useMemo(() => {
+        const hoursByTeam = teams.map(team => {
+            const teamEmployeeIds = new Set(employees.filter(e => e.team === team).map(e => e.id));
+            const loggedHours = timeLogs
+                .filter(log => teamEmployeeIds.has(log.employee_id))
+                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
+            return { label: team, value: Math.round(loggedHours) };
+        });
+        return hoursByTeam.filter(d => d.value > 0);
+    }, [teams, employees, timeLogs]);
+
+    const donutChartData = [
         { label: 'Overloaded', value: kpis.overloadedCount },
         { label: 'Healthy', value: kpis.healthyCount },
         { label: 'Underutilized', value: kpis.underutilizedCount },
     ];
     const chartColors = ['var(--danger-color)', 'var(--success-color)', 'var(--warning-color)'];
+    const barChartColors = ['var(--primary-color)', '#7986CB', '#C5CAE9', '#E8EAF6'];
 
     return (
         <div>
@@ -635,11 +854,17 @@ const DashboardView = ({ employees, timeLogs, teams, filters, setFilters }) => {
             </div>
 
             <div className="dashboard-grid">
-                <div className="card">
-                     <h3>Team Utilization</h3>
-                     <DonutChart data={chartData} colors={chartColors} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div className="card">
+                         <h3>Team Utilization Status</h3>
+                         <DonutChart data={donutChartData} colors={chartColors} />
+                    </div>
+                    <div className="card">
+                        <h3>Logged Hours by Team</h3>
+                        {teamHoursData.length > 0 ? <BarChart data={teamHoursData} colors={barChartColors} /> : <p>No hours logged for any team yet.</p>}
+                    </div>
                 </div>
-                <div className="kpi-grid" style={{gridTemplateColumns: '1fr 1fr', margin: 0}}>
+                <div className="kpi-grid" style={{gridTemplateColumns: '1fr 1fr', margin: 0, alignContent: 'start'}}>
                     <div className="card">
                         <h3>Total Employees</h3>
                         <div className="value">{kpis.totalEmployees}</div>
@@ -668,7 +893,7 @@ const DashboardView = ({ employees, timeLogs, teams, filters, setFilters }) => {
     );
 };
 
-const WorkloadView = ({ employees, timeLogs }) => {
+const WorkloadView = ({ employees, timeLogs, onEmployeeSelect }) => {
     const [sortConfig, setSortConfig] = useState({ key: 'utilization', direction: 'descending' });
     const [filters, setFilters] = useState({ team: 'all', status: 'all', from: '', to: '' });
     
@@ -786,7 +1011,7 @@ const WorkloadView = ({ employees, timeLogs }) => {
                         <tr><td colSpan={6} style={{ textAlign: 'center' }}>No employee data matches your filters.</td></tr>
                     ) : (
                         sortedData.map(item => (
-                            <tr key={item.id} className="clickable-row">
+                            <tr key={item.id} className="clickable-row" onClick={() => onEmployeeSelect(item.id)}>
                                 <td>{item.name}</td>
                                 <td>{item.team}</td>
                                 <td>{item.capacity}</td>
@@ -799,7 +1024,7 @@ const WorkloadView = ({ employees, timeLogs }) => {
                                         <span>{item.utilization.toFixed(1)}%</span>
                                     </div>
                                 </td>
-                                <td><span className={`status-tag status-${item.status.toLowerCase()}`}>{item.status}</span></td>
+                                <td><span className={`status-tag status-${item.status.toLowerCase().replace(/\s/g, '')}`}>{item.status}</span></td>
                             </tr>
                         ))
                     )}
@@ -813,8 +1038,53 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState(null);
+    const [viewMode, setViewMode] = useState('day'); // 'day' or 'week'
+    const [activeTimer, setActiveTimer] = useState(null); // { gap, startTime }
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [draggingEvent, setDraggingEvent] = useState(null);
+    const timelineRef = useRef(null);
 
     const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t.title])), [tasks]);
+
+    // Timer logic
+    useEffect(() => {
+        let interval;
+        if (activeTimer) {
+            interval = setInterval(() => {
+                setElapsedTime(Date.now() - activeTimer.startTime);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [activeTimer]);
+
+    const handleStartTimer = (gap) => {
+        setActiveTimer({ gap, startTime: Date.now() });
+    };
+
+    const handleStopTimer = () => {
+        const endTime = new Date(activeTimer.startTime + elapsedTime);
+        const startMinutes = timeToMinutes(activeTimer.gap.start_time);
+        const endMinutes = startMinutes + Math.round(elapsedTime / 60000);
+        
+        setCurrentItem({
+            task_title: '',
+            start_time: activeTimer.gap.start_time,
+            end_time: minutesToTime(endMinutes),
+            notes: '',
+            id: Date.now()
+        });
+        setIsModalOpen(true);
+        setActiveTimer(null);
+        setElapsedTime(0);
+    };
+
+    const formatElapsedTime = (ms) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+        const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+    };
 
     const dailyLogs = useMemo(() => {
         return timeLogs
@@ -825,6 +1095,7 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
     const WORK_START_HOUR = 9; // 9 AM
     const WORK_END_HOUR = 18; // 6 PM
     const TOTAL_HOURS = WORK_END_HOUR - WORK_START_HOUR;
+    const TOTAL_MINUTES = TOTAL_HOURS * 60;
 
     const { timeGaps, summary } = useMemo(() => {
         const WORK_START_MINUTES = WORK_START_HOUR * 60;
@@ -859,13 +1130,8 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
             gaps.push({ start: lastLogEndTime, end: WORK_END_MINUTES });
         }
 
-        const minutesToTime = (mins) => {
-            const h = Math.floor(mins / 60).toString().padStart(2, '0');
-            const m = (mins % 60).toString().padStart(2, '0');
-            return `${h}:${m}`;
-        };
-
-        const formattedGaps = gaps.filter(g => g.end > g.start).map(gap => ({
+        const formattedGaps = gaps.filter(g => g.end > g.start).map((gap, index) => ({
+            id: `gap-${index}`,
             start_time: minutesToTime(gap.start),
             end_time: minutesToTime(gap.end)
         }));
@@ -902,6 +1168,7 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
     const handleSave = (itemData) => {
         onSave(itemData);
         setIsModalOpen(false);
+        setDraggingEvent(null);
     };
 
     const changeDate = (offset) => {
@@ -910,6 +1177,94 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
         setSelectedDate(currentDate.toISOString().split('T')[0]);
     };
     
+    // Drag and Drop Logic
+    const handleMouseDown = (e, log, type) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const timelineRect = timelineRef.current.getBoundingClientRect();
+        const initialY = e.clientY - timelineRect.top;
+        const initialStartMinutes = timeToMinutes(log.start_time);
+        const initialEndMinutes = timeToMinutes(log.end_time);
+
+        setDraggingEvent({
+            id: log.id,
+            type,
+            initialY,
+            initialStartMinutes,
+            initialEndMinutes,
+            log,
+        });
+    };
+
+    const handleMouseMove = useCallback((e) => {
+        if (!draggingEvent) return;
+
+        const timelineRect = timelineRef.current.getBoundingClientRect();
+        const currentY = e.clientY - timelineRect.top;
+        const deltaY = currentY - draggingEvent.initialY;
+        const deltaMinutes = Math.round(deltaY / (timelineRect.height / TOTAL_MINUTES));
+
+        let newStartMinutes = draggingEvent.initialStartMinutes;
+        let newEndMinutes = draggingEvent.initialEndMinutes;
+        const duration = draggingEvent.initialEndMinutes - draggingEvent.initialStartMinutes;
+
+        if (draggingEvent.type === 'move') {
+            newStartMinutes = draggingEvent.initialStartMinutes + deltaMinutes;
+            newEndMinutes = draggingEvent.initialEndMinutes + deltaMinutes;
+        } else if (draggingEvent.type === 'resize-top') {
+            newStartMinutes = draggingEvent.initialStartMinutes + deltaMinutes;
+        } else if (draggingEvent.type === 'resize-bottom') {
+            newEndMinutes = draggingEvent.initialEndMinutes + deltaMinutes;
+        }
+        
+        // Clamp to timeline boundaries
+        const WORK_START_MINUTES = WORK_START_HOUR * 60;
+        const WORK_END_MINUTES = WORK_END_HOUR * 60;
+
+        newStartMinutes = Math.max(WORK_START_MINUTES, Math.min(newStartMinutes, WORK_END_MINUTES - 1));
+        newEndMinutes = Math.max(newStartMinutes + 1, Math.min(newEndMinutes, WORK_END_MINUTES));
+        
+        if (draggingEvent.type === 'move' && newEndMinutes > WORK_END_MINUTES) {
+            newEndMinutes = WORK_END_MINUTES;
+            newStartMinutes = newEndMinutes - duration;
+        }
+        if (draggingEvent.type === 'resize-top' && newStartMinutes >= newEndMinutes) {
+            newStartMinutes = newEndMinutes - 1;
+        }
+
+
+        const updatedLog = {
+            ...draggingEvent.log,
+            start_time: minutesToTime(newStartMinutes),
+            end_time: minutesToTime(newEndMinutes),
+        };
+
+        // Optimistic update for smooth UI
+        setDraggingEvent(prev => ({ ...prev, log: updatedLog }));
+
+    }, [draggingEvent, TOTAL_MINUTES]);
+
+    const handleMouseUp = useCallback(() => {
+        if (draggingEvent) {
+            const taskTitle = taskMap.get(draggingEvent.log.task_id) || '';
+            handleSave({ ...draggingEvent.log, task_title: taskTitle });
+        }
+    }, [draggingEvent, taskMap, onSave]);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [handleMouseMove, handleMouseUp]);
+    
+    const logsToDisplay = draggingEvent
+        ? dailyLogs.map(log => log.id === draggingEvent.id ? draggingEvent.log : log)
+        : dailyLogs;
+    
     return (
         <div>
             <div className="page-header">
@@ -917,6 +1272,10 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
                     <button className="btn-icon" onClick={() => changeDate(-1)}><span className="material-icons">chevron_left</span></button>
                     <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                     <button className="btn-icon" onClick={() => changeDate(1)}><span className="material-icons">chevron_right</span></button>
+                </div>
+                <div className="my-day-controls">
+                    <button className={`btn ${viewMode === 'day' ? 'btn-primary' : ''}`} onClick={() => setViewMode('day')}>Day</button>
+                    <button className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`} onClick={() => setViewMode('week')}>Week</button>
                 </div>
             </div>
 
@@ -935,68 +1294,87 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
                 </div>
             </div>
 
-            <div className="my-day-view">
-                <div className="card">
-                    <h3>Timeline</h3>
-                    <div className="timeline-container">
-                         {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => WORK_START_HOUR + i).map(hour => (
-                            <div key={hour} className="timeline-hour-marker" style={{ top: `${((hour - WORK_START_HOUR) / TOTAL_HOURS) * 100}%` }}>
-                                {`${hour}:00`}
-                            </div>
-                        ))}
-                        {timeGaps.map((gap, index) => {
-                            const startMinutes = timeToMinutes(gap.start_time) - (WORK_START_HOUR * 60);
-                            const endMinutes = timeToMinutes(gap.end_time) - (WORK_START_HOUR * 60);
-                            const top = (startMinutes / (TOTAL_HOURS * 60)) * 100;
-                            const height = ((endMinutes - startMinutes) / (TOTAL_HOURS * 60)) * 100;
-
-                            return (
-                                <button key={`gap-${index}`} className="timeline-gap" style={{ top: `${top}%`, height: `${height}%` }} onClick={() => handleGapClick(gap)}>
-                                    <span className="material-icons">add_circle_outline</span>
-                                    <span>{calculateDuration(gap.start_time, gap.end_time).toFixed(2)} hrs</span>
-                                </button>
-                            );
-                        })}
-                        {dailyLogs.map(log => {
-                            const startMinutes = timeToMinutes(log.start_time) - (WORK_START_HOUR * 60);
-                            const endMinutes = timeToMinutes(log.end_time) - (WORK_START_HOUR * 60);
-                            const top = (startMinutes / (TOTAL_HOURS * 60)) * 100;
-                            const height = ((endMinutes - startMinutes) / (TOTAL_HOURS * 60)) * 100;
-                            const isBreak = (taskMap.get(log.task_id) || '').toLowerCase().includes('break');
-
-                            return (
-                                <div key={log.id} className={`timeline-event ${isBreak ? 'is-break' : ''}`} style={{ top: `${top}%`, height: `${Math.max(height, 1)}%` }} title={`${log.start_time} - ${log.end_time}: ${taskMap.get(log.task_id)}`}>
-                                    <strong>{taskMap.get(log.task_id)}</strong>
-                                    <span>{log.notes}</span>
+            {viewMode === 'day' ? (
+                <div className="my-day-view">
+                    <div className="card">
+                        <h3>Timeline</h3>
+                        <div className="timeline-container" ref={timelineRef}>
+                            {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => WORK_START_HOUR + i).map(hour => (
+                                <div key={hour} className="timeline-hour-marker" style={{ top: `${((hour - WORK_START_HOUR) / TOTAL_HOURS) * 100}%` }}>
+                                    {`${hour}:00`}
                                 </div>
-                            );
-                        })}
+                            ))}
+                            {timeGaps.map((gap, index) => {
+                                const startMinutes = timeToMinutes(gap.start_time) - (WORK_START_HOUR * 60);
+                                const endMinutes = timeToMinutes(gap.end_time) - (WORK_START_HOUR * 60);
+                                const top = (startMinutes / TOTAL_MINUTES) * 100;
+                                const height = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
+
+                                const isTimerActiveForThisGap = activeTimer && activeTimer.gap.id === gap.id;
+
+                                return (
+                                    <div key={`gap-${index}`} className="timeline-gap" style={{ top: `${top}%`, height: `${height}%` }} onClick={() => !activeTimer && handleGapClick(gap)}>
+                                        {isTimerActiveForThisGap ? (
+                                            <>
+                                                <span className="timeline-gap-timer">{formatElapsedTime(elapsedTime)}</span>
+                                                <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleStopTimer();}}>Stop</button>
+                                            </>
+                                        ) : !activeTimer && (
+                                            <>
+                                                <span className="material-icons">add_circle_outline</span>
+                                                <span>{calculateDuration(gap.start_time, gap.end_time).toFixed(2)} hrs</span>
+                                                <button className="btn" onClick={(e) => { e.stopPropagation(); handleStartTimer(gap);}}>▶ Start</button>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {logsToDisplay.map(log => {
+                                const startMinutes = timeToMinutes(log.start_time) - (WORK_START_HOUR * 60);
+                                const endMinutes = timeToMinutes(log.end_time) - (WORK_START_HOUR * 60);
+                                const top = (startMinutes / TOTAL_MINUTES) * 100;
+                                const height = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
+                                const isBreak = (taskMap.get(log.task_id) || '').toLowerCase().includes('break');
+                                const isDragging = draggingEvent && draggingEvent.id === log.id;
+
+                                return (
+                                    <div key={log.id} className={`timeline-event ${isBreak ? 'is-break' : ''} ${isDragging ? 'is-dragging': ''}`} style={{ top: `${top}%`, height: `${Math.max(height, 1)}%` }} title={`${log.start_time} - ${log.end_time}: ${taskMap.get(log.task_id)}`} onMouseDown={(e) => handleMouseDown(e, log, 'move')}>
+                                        <div className="resize-handle top" onMouseDown={(e) => handleMouseDown(e, log, 'resize-top')}></div>
+                                        <strong>{taskMap.get(log.task_id)}</strong>
+                                        <span>{log.notes}</span>
+                                        <div className="resize-handle bottom" onMouseDown={(e) => handleMouseDown(e, log, 'resize-bottom')}></div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className="card">
+                        <h3>Activities</h3>
+                        <div className="activity-list">
+                            {dailyLogs.length === 0 ? <p>No activities logged. Click a gap in the timeline to start.</p> : (
+                                <ul>
+                                    {dailyLogs.map(log => (
+                                        <li key={log.id} className="activity-item">
+                                            <div className="activity-item-info">
+                                                <span className="title">{taskMap.get(log.task_id) || 'Unknown Task'}</span>
+                                                <span className="meta">{log.start_time} - {log.end_time} ({calculateDuration(log.start_time, log.end_time).toFixed(2)} hrs)</span>
+                                                {log.notes && <p className="notes">"{log.notes}"</p>}
+                                            </div>
+                                            <div className="actions">
+                                                <button className="btn-icon" onClick={() => handleEdit(log)}><span className="material-icons">edit</span></button>
+                                                <button className="btn-icon" onClick={() => onDelete(log.id, "Time Logs")}><span className="material-icons" style={{color: 'var(--danger-color)'}}>delete</span></button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <div className="card">
-                     <h3>Activities</h3>
-                     <div className="activity-list">
-                        {dailyLogs.length === 0 ? <p>No activities logged. Click a gap in the timeline to start.</p> : (
-                            <ul>
-                                {dailyLogs.map(log => (
-                                    <li key={log.id} className="activity-item">
-                                        <div className="activity-item-info">
-                                            <span className="title">{taskMap.get(log.task_id) || 'Unknown Task'}</span>
-                                            <span className="meta">{log.start_time} - {log.end_time} ({calculateDuration(log.start_time, log.end_time).toFixed(2)} hrs)</span>
-                                            {log.notes && <p className="notes">"{log.notes}"</p>}
-                                        </div>
-                                        <div className="actions">
-                                            <button className="btn-icon" onClick={() => handleEdit(log)}><span className="material-icons">edit</span></button>
-                                            <button className="btn-icon" onClick={() => onDelete(log.id, "Time Logs")}><span className="material-icons" style={{color: 'var(--danger-color)'}}>delete</span></button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                     </div>
-                </div>
-            </div>
-             {isModalOpen && (
+            ) : (
+                <WeekTimeline selectedDate={selectedDate} timeLogs={timeLogs} loggedInEmployeeId={loggedInEmployeeId} taskMap={taskMap} />
+            )}
+            {isModalOpen && (
                 <Modal title={currentItem && timeLogs.some(l => l.id === currentItem.id) ? 'Edit Activity' : 'Add Activity'} onClose={() => setIsModalOpen(false)}>
                     <ActivityForm 
                         item={currentItem} 
@@ -1012,7 +1390,62 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
     )
 };
 
-const GenericCrudView = ({ title, columns, data, onAdd, onUpdate, onDelete, AddEditFormComponent, sheetName }) => {
+const WeekTimeline = ({ selectedDate, timeLogs, loggedInEmployeeId, taskMap }) => {
+    const WORK_START_HOUR = 9;
+    const TOTAL_HOURS = 9;
+
+    const weekData = useMemo(() => {
+        const startOfWeek = new Date(selectedDate);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Assuming Sunday is the start of the week
+        
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(startOfWeek);
+            day.setDate(day.getDate() + i);
+            const dateString = day.toISOString().split('T')[0];
+            const logs = timeLogs
+                .filter(log => log.employee_id === loggedInEmployeeId && log.date === dateString)
+                .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+            days.push({
+                date: day,
+                logs: logs,
+            });
+        }
+        return days;
+    }, [selectedDate, timeLogs, loggedInEmployeeId]);
+
+    return (
+        <div className="card">
+            <h3>Weekly Overview</h3>
+            <div className="week-view-container">
+                {weekData.map(({ date, logs }) => (
+                    <div key={date.toISOString()} className="week-day-column">
+                        <div className="week-day-header">
+                            <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                            <div>{date.toLocaleDateString('en-US', { day: 'numeric' })}</div>
+                        </div>
+                        <div className="week-day-timeline">
+                             {logs.map(log => {
+                                const startMinutes = timeToMinutes(log.start_time) - (WORK_START_HOUR * 60);
+                                const endMinutes = timeToMinutes(log.end_time) - (WORK_START_HOUR * 60);
+                                const top = (startMinutes / (TOTAL_HOURS * 60)) * 100;
+                                const height = ((endMinutes - startMinutes) / (TOTAL_HOURS * 60)) * 100;
+                                
+                                return (
+                                    <div key={log.id} className="week-event" style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }} title={taskMap.get(log.task_id)}>
+                                        {taskMap.get(log.task_id)}
+                                    </div>
+                                );
+                             })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const GenericCrudView = ({ title, columns, data, onAdd, onUpdate, onDelete, AddEditFormComponent, sheetName, emptyState, ...restProps }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -1063,18 +1496,23 @@ const GenericCrudView = ({ title, columns, data, onAdd, onUpdate, onDelete, AddE
                     </button>
                 </div>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        {columns.map(col => <th key={col.key}>{col.header}</th>)}
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredData.length === 0 ? (
-                        <tr><td colSpan={columns.length + 1} style={{ textAlign: 'center' }}>No {title.toLowerCase()} found.</td></tr>
-                    ) : (
-                        filteredData.map(item => (
+            {filteredData.length === 0 ? (
+                <EmptyState 
+                    icon={emptyState.icon}
+                    title={emptyState.title}
+                    message={emptyState.message}
+                    action={<button className="btn btn-primary" onClick={handleAddClick}>{emptyState.actionText}</button>}
+                />
+            ) : (
+                <table>
+                    <thead>
+                        <tr>
+                            {columns.map(col => <th key={col.key}>{col.header}</th>)}
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredData.map(item => (
                             <tr key={item.id}>
                                 {columns.map(col => <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>)}
                                 <td>
@@ -1088,13 +1526,13 @@ const GenericCrudView = ({ title, columns, data, onAdd, onUpdate, onDelete, AddE
                                     </div>
                                 </td>
                             </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
+                        ))}
+                    </tbody>
+                </table>
+            )}
             {isModalOpen && (
                 <Modal title={currentItem ? `Edit ${title.slice(0,-1)}` : `Add New ${title.slice(0,-1)}`} onClose={() => setIsModalOpen(false)}>
-                    <AddEditFormComponent item={currentItem} onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
+                    <AddEditFormComponent item={currentItem} onSave={handleSave} onCancel={() => setIsModalOpen(false)} {...restProps} />
                 </Modal>
             )}
         </div>
@@ -1134,13 +1572,53 @@ const EmployeeForm = ({ item, onSave, onCancel, teams, roles }) => {
     );
 };
 
-const TaskForm = ({ item, onSave, onCancel, employees, taskTypes }) => {
+const TaskForm = ({ item, onSave, onCancel, employees, taskTypes, timeLogs, tasks }) => {
     const [formData, setFormData] = useState(item || { title: '', type: '', complexity: 3, status: 'Not Started', assigned_employee_id: '' });
+    
+    const employeeSuggestions = useMemo(() => {
+        if (!employees.length) return [];
+
+        const taskTypeMap = new Map(tasks.map(t => [t.id, t.type]));
+
+        const employeeWorkload = employees.map(emp => {
+            const loggedHours = timeLogs
+                .filter(log => log.employee_id === emp.id)
+                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
+            
+            const utilization = emp.weekly_capacity_hours > 0 ? (loggedHours / emp.weekly_capacity_hours) * 100 : 0;
+
+            const pastTaskTypes = new Set(
+                timeLogs.filter(log => log.employee_id === emp.id)
+                .map(log => taskTypeMap.get(log.task_id))
+                .filter(Boolean)
+            );
+
+            // Scoring logic
+            const utilizationScore = Math.max(0, 100 - utilization); // Higher score for less utilization
+            let skillScore = 0;
+            if (formData.type && pastTaskTypes.has(formData.type)) {
+                skillScore = 50; // Bonus points for relevant experience
+            }
+            
+            return {
+                ...emp,
+                utilization,
+                score: utilizationScore + skillScore,
+            };
+        });
+
+        return employeeWorkload.sort((a, b) => b.score - a.score);
+    }, [employees, timeLogs, tasks, formData.type]);
+
     const handleChange = (e) => setFormData(p => ({...p, [e.target.name]: e.target.value}));
     const handleSubmit = (e) => {
         e.preventDefault();
         onSave({ ...formData, id: item?.id || Date.now(), complexity: parseInt(formData.complexity), assigned_employee_id: formData.assigned_employee_id ? parseInt(formData.assigned_employee_id) : null });
     };
+
+    const suggestedEmployees = employeeSuggestions.slice(0, 3);
+    const otherEmployees = employeeSuggestions.slice(3);
+
     return (
         <form onSubmit={handleSubmit}>
             <div className="form-group"><label>Title</label><input type="text" name="title" value={formData.title} onChange={handleChange} required/></div>
@@ -1153,7 +1631,30 @@ const TaskForm = ({ item, onSave, onCancel, employees, taskTypes }) => {
             </div>
             <div className="form-group"><label>Complexity (1-5)</label><input type="number" name="complexity" min="1" max="5" value={formData.complexity} onChange={handleChange} required/></div>
             <div className="form-group"><label>Status</label><select name="status" value={formData.status} onChange={handleChange} required><option>Not Started</option><option>In Progress</option><option>Completed</option></select></div>
-            <div className="form-group"><label>Assign to</label><select name="assigned_employee_id" value={formData.assigned_employee_id || ''} onChange={handleChange}><option value="">Unassigned</option>{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+            <div className="form-group">
+                <label>Assign to</label>
+                <select name="assigned_employee_id" value={formData.assigned_employee_id || ''} onChange={handleChange}>
+                    <option value="">Unassigned</option>
+                    {suggestedEmployees.length > 0 && (
+                        <optgroup label="⭐ Suggested">
+                            {suggestedEmployees.map(e => (
+                                <option key={e.id} value={e.id}>
+                                    {e.name} ({e.utilization.toFixed(0)}% Utilized)
+                                </option>
+                            ))}
+                        </optgroup>
+                    )}
+                     {otherEmployees.length > 0 && (
+                        <optgroup label="Others">
+                            {otherEmployees.map(e => (
+                                <option key={e.id} value={e.id}>
+                                    {e.name} ({e.utilization.toFixed(0)}% Utilized)
+                                </option>
+                            ))}
+                        </optgroup>
+                     )}
+                </select>
+            </div>
             <div className="modal-actions"><button type="button" className="btn" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary">Save</button></div>
         </form>
     );
@@ -1208,6 +1709,42 @@ const ActivityForm = ({ item, onSave, onCancel, tasks, employeeId, date }) => {
     );
 };
 
+const ThemeSettings = ({ currentThemeColor, onThemeColorChange, onClose }) => {
+    const popoverRef = useRef(null);
+    const themeColors = {
+        indigo: '#283593',
+        teal: '#00796B',
+        orange: '#E65100',
+        pink: '#C2185B',
+    };
+
+     useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [popoverRef, onClose]);
+
+    return (
+        <div className="theme-settings-popover" ref={popoverRef}>
+            <strong>Theme Color</strong>
+            <div className="theme-colors">
+                {Object.entries(themeColors).map(([name, color]) => (
+                    <div 
+                        key={name}
+                        className={`theme-color-swatch ${currentThemeColor === color ? 'active' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => onThemeColorChange(color)}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 const App = () => {
@@ -1220,6 +1757,16 @@ const App = () => {
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [filters, setFilters] = useState({team: 'all'});
     const [loggedInEmployeeId, setLoggedInEmployeeId] = useState<number | null>(null);
+
+    const [theme, setTheme] = useLocalStorage('theme', 'light');
+    const [primaryColor, setPrimaryColor] = useLocalStorage('primaryColor', '#283593');
+    const [showThemeSettings, setShowThemeSettings] = useState(false);
+
+    useEffect(() => {
+        document.body.className = theme === 'dark' ? 'dark-mode' : '';
+        document.documentElement.style.setProperty('--primary-color', primaryColor);
+        document.documentElement.style.setProperty('--accent-color', primaryColor);
+    }, [theme, primaryColor]);
 
     
     const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1f5OBwtGiZi-u2Qp7PiWYlN7WsrxpAKHFJGei6w9PtaQ/edit?usp=sharing';
@@ -1531,10 +2078,20 @@ const App = () => {
     const taskTypes = useMemo(() => [...new Set(tasks.map(t => t.type).filter(Boolean))], [tasks]);
 
     const AddEditEmployeeForm = useCallback((props) => <EmployeeForm {...props} teams={teams} roles={roles} />, [teams, roles]);
-    const AddEditTaskForm = useCallback((props) => <TaskForm {...props} employees={employees} taskTypes={taskTypes} />, [employees, taskTypes]);
+    const AddEditTaskForm = useCallback((props) => <TaskForm {...props} employees={employees} taskTypes={taskTypes} timeLogs={timeLogs} tasks={tasks} />, [employees, taskTypes, timeLogs, tasks]);
     const AddEditActivityForm = useCallback((props) => <ActivityForm {...props} tasks={tasks} employeeId={loggedInEmployeeId} date={new Date().toISOString().split('T')[0]} />, [tasks, loggedInEmployeeId]);
+
+    const handleEmployeeSelect = (employeeId) => {
+        setLoggedInEmployeeId(employeeId);
+        setPage('myday');
+    };
     
     const pageTitles = { dashboard: 'Dashboard Overview', myday: 'My Day', workload: 'Workload Analysis', employees: 'Employees', timelogs: 'All Time Logs', tasks: 'Task Management' };
+    const emptyStates = {
+        employees: { icon: 'groups', title: 'No Employees Found', message: "You haven't added any employees yet. Let's add the first one!", actionText: "Add Employee" },
+        tasks: { icon: 'list_alt', title: 'No Tasks Found', message: "Create your first task to start tracking work.", actionText: "Add Task" },
+        timelogs: { icon: 'schedule', title: 'No Time Logs Found', message: "Time logs will appear here once employees start logging their activities.", actionText: "Log Activity" },
+    };
     
     return (
         <>
@@ -1569,15 +2126,31 @@ const App = () => {
                                 </div>
                             )}
                             <button className="btn" onClick={syncData} disabled={isLoading}><span className="material-icons">sync</span> Sync Data</button>
+                             <button className="btn-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle dark mode">
+                                <span className="material-icons">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
+                            </button>
+                             <div style={{ position: 'relative' }}>
+                                <button className="btn-icon" onClick={() => setShowThemeSettings(s => !s)} aria-label="Theme settings">
+                                    <span className="material-icons">palette</span>
+                                </button>
+                                {showThemeSettings && <ThemeSettings currentThemeColor={primaryColor} onThemeColorChange={setPrimaryColor} onClose={() => setShowThemeSettings(false)}/>}
+                            </div>
                         </div>
                     </header>
                     {page === 'dashboard' && <DashboardView employees={employees} timeLogs={timeLogs} teams={teams} filters={filters} setFilters={setFilters} />}
                     {page === 'myday' && loggedInEmployeeId && <MyDayView loggedInEmployeeId={loggedInEmployeeId} timeLogs={timeLogs} tasks={tasks} onSave={handleActivitySave} onDelete={timeLogHandlers.onDelete} />}
-                    {page === 'workload' && <WorkloadView employees={employees} timeLogs={timeLogs} />}
-                    {page === 'employees' && <GenericCrudView title="Employees" data={employees} {...employeeCrud} sheetName="Employees" AddEditFormComponent={AddEditEmployeeForm} columns={employeeColumns} />}
-                    {page === 'tasks' && <GenericCrudView title="Tasks" data={tasks} {...taskCrud} sheetName="Tasks" AddEditFormComponent={AddEditTaskForm} columns={taskColumns} />}
-                    {page === 'timelogs' && <GenericCrudView title="Time Logs" data={timeLogsWithTaskTitles} {...timeLogCrud} sheetName="Time Logs" AddEditFormComponent={AddEditActivityForm} columns={timeLogColumns} />}
+                    {page === 'workload' && <WorkloadView employees={employees} timeLogs={timeLogs} onEmployeeSelect={handleEmployeeSelect} />}
+                    {page === 'employees' && <GenericCrudView title="Employees" data={employees} {...employeeCrud} sheetName="Employees" AddEditFormComponent={AddEditEmployeeForm} columns={employeeColumns} emptyState={emptyStates.employees} />}
+                    {page === 'tasks' && <GenericCrudView title="Tasks" data={tasks} {...taskCrud} sheetName="Tasks" AddEditFormComponent={AddEditTaskForm} columns={taskColumns} emptyState={emptyStates.tasks} timeLogs={timeLogs} tasks={tasks} employees={employees}/>}
+                    {page === 'timelogs' && <GenericCrudView title="Time Logs" data={timeLogsWithTaskTitles} {...timeLogCrud} sheetName="Time Logs" AddEditFormComponent={AddEditActivityForm} columns={timeLogColumns} emptyState={emptyStates.timelogs} />}
                 </main>
+                 <nav className="bottom-nav">
+                    <BottomNavItem icon="dashboard" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
+                    <BottomNavItem icon="today" label="My Day" active={page === 'myday'} onClick={() => setPage('myday')} />
+                    <BottomNavItem icon="bar_chart" label="Workload" active={page === 'workload'} onClick={() => setPage('workload')} />
+                    <BottomNavItem icon="groups" label="Employees" active={page === 'employees'} onClick={() => setPage('employees')} />
+                    <BottomNavItem icon="list_alt" label="Tasks" active={page === 'tasks'} onClick={() => setPage('tasks')} />
+                </nav>
             </div>
         </>
     );
