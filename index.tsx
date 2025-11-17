@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -136,16 +137,11 @@ const GlobalStyles = `
         gap: 24px;
         margin-bottom: 32px;
     }
-    .dashboard-grid {
+    .insights-grid {
         display: grid;
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
         gap: 24px;
         align-items: start;
-    }
-    @media (max-width: 1200px) {
-        .dashboard-grid {
-            grid-template-columns: 1fr;
-        }
     }
     .card {
         background-color: var(--card-bg-color);
@@ -303,18 +299,20 @@ const GlobalStyles = `
         color: var(--text-primary);
     }
     .loading-overlay {
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(var(--card-bg-color-rgb), 0.8);
+        backdrop-filter: blur(4px);
         display: flex;
         justify-content: center;
         align-items: center;
+        z-index: 9999;
+        color: var(--text-primary);
         font-size: 1.2rem;
-        z-index: 999;
-        color: white;
+        font-weight: 600;
     }
     .status-tag {
         padding: 4px 12px;
@@ -350,22 +348,27 @@ const GlobalStyles = `
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background-color: var(--bg-color); }
 
-    .empty-state {
+    .empty-state, .setup-view {
         text-align: center;
         padding: 48px;
         color: var(--text-secondary);
+        max-width: 600px;
+        margin: 40px auto;
+        background: var(--card-bg-color);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
     }
-    .empty-state .material-icons {
+    .empty-state .material-icons, .setup-view .material-icons {
         font-size: 64px;
         margin-bottom: 16px;
-        color: var(--border-color);
+        color: var(--primary-color);
     }
-    .empty-state h3 {
-        font-size: 20px;
+    .empty-state h3, .setup-view h3 {
+        font-size: 24px;
         color: var(--text-primary);
         margin: 0 0 8px 0;
     }
-    .empty-state p { margin: 0 0 24px 0; }
+    .empty-state p, .setup-view p { margin: 0 0 24px 0; line-height: 1.6; }
     
     /* My Day View Styles */
     .my-day-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
@@ -468,6 +471,8 @@ const GlobalStyles = `
     .activity-item-info .title { font-weight: 600; }
     .activity-item-info .meta { font-size: 14px; color: var(--text-secondary); }
     .activity-item-info .notes { font-size: 14px; color: var(--text-primary); margin-top: 4px; font-style: italic; }
+    .my-tasks-list .activity-item:hover { background-color: var(--border-color); cursor: pointer; }
+
 
     /* Week View */
     .week-view-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
@@ -484,7 +489,7 @@ const GlobalStyles = `
         .sidebar, .sidebar-toggle { display: none; }
         .main-content { padding: 16px; padding-bottom: calc(var(--bottom-nav-height) + 16px); }
         .header h1 { margin-left: 0 !important; font-size: 24px; }
-        .dashboard-grid { grid-template-columns: 1fr; }
+        .insights-grid { grid-template-columns: 1fr; }
         .bottom-nav {
             display: flex;
             position: fixed;
@@ -533,10 +538,34 @@ const GlobalStyles = `
     .theme-color-swatch.active {
         border-color: var(--text-primary);
     }
+
+    /* Project Detail View */
+    .project-detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        gap: 16px;
+    }
+    .project-detail-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .project-detail-info h2 {
+        margin: 0;
+        font-size: 24px;
+    }
+    .project-detail-meta {
+        display: flex;
+        gap: 16px;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
 `;
 
 // --- TYPES ---
-type Page = 'dashboard' | 'myday' | 'timelogs' | 'tasks' | 'employees' | 'workload';
+type Page = 'myday' | 'projects' | 'insights' | 'employees';
 type ToastType = 'success' | 'error';
 type TaskStatus = 'Not Started' | 'In Progress' | 'Completed';
 type Theme = 'light' | 'dark';
@@ -596,60 +625,60 @@ const minutesToTime = (mins: number) => {
     return `${h}:${m}`;
 };
 
-const useLocalStorage = (key, initialValue) => {
-    const [storedValue, setStoredValue] = useState(() => {
+function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
+    const [storedValue, setStoredValue] = useState<T>(() => {
         try {
             const item = window.localStorage.getItem(key);
             return item ? JSON.parse(item) : initialValue;
-        } catch (error) {
+        } catch (error: any) {
             console.log(error);
             return initialValue;
         }
     });
 
-    const setValue = (value) => {
+    const setValue = (value: T | ((val: T) => T)) => {
         try {
             const valueToStore = value instanceof Function ? value(storedValue) : value;
             setStoredValue(valueToStore);
             window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        } catch (error) {
+        } catch (error: any) {
             console.log(error);
         }
     };
     return [storedValue, setValue];
-};
+}
 
 // --- REUSABLE COMPONENTS ---
 
-const Modal: React.FC<{ title: any, onClose: any, children: React.ReactNode }> = ({ title, children, onClose }) => {
+interface ModalProps {
+    title: React.ReactNode;
+    onClose: () => void;
+    children?: React.ReactNode;
+}
+function Modal({ title, children, onClose }: ModalProps) {
     const mouseDownTarget = useRef(null);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        mouseDownTarget.current = e.target;
-    };
-
+    const handleMouseDown = (e: React.MouseEvent) => { mouseDownTarget.current = e.target as any; };
     const handleMouseUp = (e: React.MouseEvent) => {
-        if (mouseDownTarget.current === e.target && e.currentTarget === e.target) {
-            onClose();
-        }
+        if (mouseDownTarget.current === e.target && e.currentTarget === e.target) { onClose(); }
     };
-
     return (
         <div className="modal-backdrop" onMouseDown={handleMouseDown} onMouseUp={handleMouseUp}>
             <div className="modal-content">
                 <div className="modal-header">
                     <h2>{title}</h2>
-                    <button onClick={onClose} className="btn-icon" aria-label="Close modal">
-                        <span className="material-icons">close</span>
-                    </button>
+                    <button onClick={onClose} className="btn-icon" aria-label="Close modal"><span className="material-icons">close</span></button>
                 </div>
                 {children}
             </div>
         </div>
     );
-};
+}
 
-const ToastNotifications = ({ toasts, setToasts }) => {
+interface ToastNotificationsProps {
+    toasts: Toast[];
+    setToasts: React.Dispatch<React.SetStateAction<Toast[]>>;
+}
+const ToastNotifications = ({ toasts, setToasts }: ToastNotificationsProps) => {
     useEffect(() => {
         if (toasts.length > 0) {
             const timer = setTimeout(() => setToasts(prev => prev.slice(1)), 3000);
@@ -669,7 +698,15 @@ const ToastNotifications = ({ toasts, setToasts }) => {
     );
 };
 
-const DonutChart = ({ data, colors }) => {
+interface ChartDataItem {
+    label: string;
+    value: number;
+}
+interface DonutChartProps {
+    data: ChartDataItem[];
+    colors: string[];
+}
+const DonutChart = ({ data, colors }: DonutChartProps) => {
     const size = 180;
     const strokeWidth = 20;
     const radius = (size - strokeWidth) / 2;
@@ -688,17 +725,7 @@ const DonutChart = ({ data, colors }) => {
                         const dasharray = (item.value / total) * circumference;
                         accumulated += item.value;
                         return (
-                            <circle
-                                key={index}
-                                r={radius}
-                                cx={size/2}
-                                cy={size/2}
-                                fill="transparent"
-                                stroke={colors[index % colors.length]}
-                                strokeWidth={strokeWidth}
-                                strokeDasharray={`${dasharray} ${circumference}`}
-                                strokeDashoffset={dashoffset}
-                            />
+                            <circle key={index} r={radius} cx={size/2} cy={size/2} fill="transparent" stroke={colors[index % colors.length]} strokeWidth={strokeWidth} strokeDasharray={`${dasharray} ${circumference}`} strokeDashoffset={dashoffset} />
                         );
                     })}
                 </g>
@@ -715,7 +742,11 @@ const DonutChart = ({ data, colors }) => {
     );
 };
 
-const BarChart = ({ data, colors }) => {
+interface BarChartProps {
+    data: ChartDataItem[];
+    colors: string[];
+}
+const BarChart = ({ data, colors }: BarChartProps) => {
     const chartHeight = 220;
     const chartWidth = 350;
     const barGap = 10;
@@ -732,20 +763,9 @@ const BarChart = ({ data, colors }) => {
                         const y = chartHeight - barHeight - 20;
                         return (
                             <g key={index}>
-                                <rect
-                                    x={x}
-                                    y={y}
-                                    width={barWidth}
-                                    height={barHeight}
-                                    fill={colors[index % colors.length]}
-                                    rx="4"
-                                />
-                                <text x={x + barWidth / 2} y={chartHeight - 5} textAnchor="middle" fontSize="12" fill="var(--text-secondary)">
-                                    {item.label}
-                                </text>
-                                <text x={x + barWidth / 2} y={y - 5} textAnchor="middle" fontSize="12" fill="var(--text-primary)" fontWeight="bold">
-                                    {item.value}h
-                                </text>
+                                <rect x={x} y={y} width={barWidth} height={barHeight} fill={colors[index % colors.length]} rx="4" />
+                                <text x={x + barWidth / 2} y={chartHeight - 5} textAnchor="middle" fontSize="12" fill="var(--text-secondary)">{item.label}</text>
+                                <text x={x + barWidth / 2} y={y - 5} textAnchor="middle" fontSize="12" fill="var(--text-primary)" fontWeight="bold">{item.value}h</text>
                             </g>
                         );
                     })}
@@ -755,7 +775,13 @@ const BarChart = ({ data, colors }) => {
     );
 };
 
-const EmptyState = ({ icon, title, message, action }) => (
+interface EmptyStateProps {
+    icon: string;
+    title: string;
+    message: string;
+    action: React.ReactNode;
+}
+const EmptyState = ({ icon, title, message, action }: EmptyStateProps) => (
     <div className="empty-state">
         <span className="material-icons">{icon}</span>
         <h3>{title}</h3>
@@ -764,142 +790,61 @@ const EmptyState = ({ icon, title, message, action }) => (
     </div>
 );
 
-const NavItem = ({ icon, label, active, onClick }) => (
-    <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
-        <span className="material-icons">{icon}</span>
-        <span>{label}</span>
-    </div>
-);
-
-const BottomNavItem = ({ icon, label, active, onClick }) => (
-    <div className={`bottom-nav-item ${active ? 'active' : ''}`} onClick={onClick}>
-        <span className="material-icons">{icon}</span>
-        <span>{label}</span>
-    </div>
-);
-
-
-// --- VIEW COMPONENTS ---
-
-const DashboardView = ({ employees, timeLogs, teams, filters, setFilters }) => {
-    const filteredEmployees = useMemo(() => {
-        return filters.team === 'all' ? employees : employees.filter(e => e.team === filters.team);
-    }, [employees, filters.team]);
-
-    const filteredTimeLogs = useMemo(() => {
-        const employeeIds = new Set(filteredEmployees.map(e => e.id));
-        return timeLogs.filter(log => employeeIds.has(log.employee_id));
-    }, [timeLogs, filteredEmployees]);
-
-    const kpis = useMemo(() => {
-        if (filteredEmployees.length === 0) {
-            return { totalEmployees: 0, avgUtilization: '0.0', overloadedCount: 0, underutilizedCount: 0, healthyCount: 0 };
-        }
-
-        const employeeHours = filteredEmployees.map(emp => {
-            const loggedHours = filteredTimeLogs
-                .filter(log => log.employee_id === emp.id)
-                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
-            return {
-                utilization: emp.weekly_capacity_hours > 0 ? (loggedHours / emp.weekly_capacity_hours) : 0
-            };
-        });
-        
-        const totalLoggedHours = filteredTimeLogs.reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
-        const totalCapacityHours = filteredEmployees.reduce((sum, emp) => sum + emp.weekly_capacity_hours, 0);
-        const avgUtilization = totalCapacityHours > 0 ? (totalLoggedHours / totalCapacityHours * 100) : 0;
-
-        const overloadedCount = employeeHours.filter(emp => emp.utilization > 1.2).length;
-        const underutilizedCount = employeeHours.filter(emp => emp.utilization < 0.8).length;
-        const healthyCount = employeeHours.length - overloadedCount - underutilizedCount;
-
-        return {
-            totalEmployees: filteredEmployees.length,
-            avgUtilization: avgUtilization.toFixed(1),
-            overloadedCount,
-            underutilizedCount,
-            healthyCount
-        };
-    }, [filteredEmployees, filteredTimeLogs]);
-
-    const teamHoursData = useMemo(() => {
-        const hoursByTeam = teams.map(team => {
-            const teamEmployeeIds = new Set(employees.filter(e => e.team === team).map(e => e.id));
-            const loggedHours = timeLogs
-                .filter(log => teamEmployeeIds.has(log.employee_id))
-                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
-            return { label: team, value: Math.round(loggedHours) };
-        });
-        return hoursByTeam.filter(d => d.value > 0);
-    }, [teams, employees, timeLogs]);
-
-    const donutChartData = [
-        { label: 'Overloaded', value: kpis.overloadedCount },
-        { label: 'Healthy', value: kpis.healthyCount },
-        { label: 'Underutilized', value: kpis.underutilizedCount },
-    ];
-    const chartColors = ['var(--danger-color)', 'var(--success-color)', 'var(--warning-color)'];
-    const barChartColors = ['var(--primary-color)', '#7986CB', '#C5CAE9', '#E8EAF6'];
-
+interface NavItemProps {
+    key?: React.Key;
+    icon: string;
+    label: string;
+    active: boolean;
+    onClick: () => void;
+}
+function NavItem({ icon, label, active, onClick }: NavItemProps) {
     return (
-        <div>
-            <div className="page-filters" style={{marginBottom: '24px'}}>
-                 <div className="filter-group">
-                    <label htmlFor="team-filter">Filter by Team</label>
-                    <select id="team-filter" value={filters.team} onChange={e => setFilters(prev => ({...prev, team: e.target.value}))}>
-                        <option value="all">All Teams</option>
-                        {teams.map(team => <option key={team} value={team}>{team}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            <div className="dashboard-grid">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    <div className="card">
-                         <h3>Team Utilization Status</h3>
-                         <DonutChart data={donutChartData} colors={chartColors} />
-                    </div>
-                    <div className="card">
-                        <h3>Logged Hours by Team</h3>
-                        {teamHoursData.length > 0 ? <BarChart data={teamHoursData} colors={barChartColors} /> : <p>No hours logged for any team yet.</p>}
-                    </div>
-                </div>
-                <div className="kpi-grid" style={{gridTemplateColumns: '1fr 1fr', margin: 0, alignContent: 'start'}}>
-                    <div className="card">
-                        <h3>Total Employees</h3>
-                        <div className="value">{kpis.totalEmployees}</div>
-                    </div>
-                    <div className="card">
-                        <h3>Avg. Utilization</h3>
-                        <div className="value">{kpis.avgUtilization}<span className="unit">%</span></div>
-                    </div>
-                    <div className="card">
-                        <h3>Overloaded (&gt;120%)</h3>
-                        <div className="value" style={{color: 'var(--danger-color)'}}>{kpis.overloadedCount}</div>
-                    </div>
-                    <div className="card">
-                        <h3>Underutilized (&lt;80%)</h3>
-                        <div className="value" style={{color: 'var(--warning-color)'}}>{kpis.underutilizedCount}</div>
-                    </div>
-                </div>
-            </div>
-             {employees.length === 0 && (
-                <div className="card" style={{marginTop: '24px'}}>
-                    <h3>Welcome!</h3>
-                    <p>Data is syncing from your Google Sheet. If this message persists, please check your internet connection and the sheet's sharing settings.</p>
-                </div>
-            )}
+        <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
+            <span className="material-icons">{icon}</span>
+            <span>{label}</span>
         </div>
     );
-};
+}
 
-const WorkloadView = ({ employees, timeLogs, onEmployeeSelect }) => {
-    const [sortConfig, setSortConfig] = useState({ key: 'utilization', direction: 'descending' });
+interface BottomNavItemProps {
+    key?: React.Key;
+    icon: string;
+    label: string;
+    active: boolean;
+    onClick: () => void;
+}
+function BottomNavItem({ icon, label, active, onClick }: BottomNavItemProps) {
+    return (
+        <div className={`bottom-nav-item ${active ? 'active' : ''}`} onClick={onClick}>
+            <span className="material-icons">{icon}</span>
+            <span>{label}</span>
+        </div>
+    );
+}
+
+// --- VIEW COMPONENTS ---
+interface WorkloadDataItem {
+    id: number;
+    name: string;
+    team: string;
+    capacity: number;
+    loggedHours: string;
+    utilization: number;
+    status: string;
+    barColor: string;
+}
+interface InsightsViewProps {
+    employees: Employee[];
+    timeLogs: TimeLog[];
+    tasks: Task[];
+    teams: string[];
+    onEmployeeSelect: (id: number) => void;
+}
+const InsightsView = ({ employees, timeLogs, tasks, teams, onEmployeeSelect }: InsightsViewProps) => {
     const [filters, setFilters] = useState({ team: 'all', status: 'all', from: '', to: '' });
-    
-    const teams = useMemo(() => [...new Set(employees.map(e => e.team))], [employees]);
+    const [sortConfig, setSortConfig] = useState<{key: keyof WorkloadDataItem, direction: string}>({ key: 'utilization', direction: 'descending' });
 
-    const filteredTimeLogs = useMemo(() => {
+    const filteredTimeLogsForDates = useMemo(() => {
         if (!filters.from && !filters.to) return timeLogs;
         return timeLogs.filter(log => {
             const logDate = new Date(log.date);
@@ -910,107 +855,130 @@ const WorkloadView = ({ employees, timeLogs, onEmployeeSelect }) => {
             return true;
         });
     }, [timeLogs, filters.from, filters.to]);
-    
-    const workloadData = useMemo(() => {
-        let filteredEmployees = employees;
-        if (filters.team !== 'all') {
-            filteredEmployees = filteredEmployees.filter(emp => emp.team === filters.team);
-        }
 
-        const data = filteredEmployees.map(emp => {
-            const loggedHours = filteredTimeLogs
-                .filter(log => log.employee_id === emp.id)
-                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
-            
+    const filteredEmployees = useMemo(() => {
+        return filters.team === 'all' ? employees : employees.filter(e => e.team === filters.team);
+    }, [employees, filters.team]);
+
+    const kpis = useMemo(() => {
+        if (filteredEmployees.length === 0) {
+            return { totalEmployees: 0, avgUtilization: '0.0', overloadedCount: 0, underutilizedCount: 0, healthyCount: 0 };
+        }
+        const employeeIds = new Set(filteredEmployees.map(e => e.id));
+        const relevantTimeLogs = filteredTimeLogsForDates.filter(log => employeeIds.has(log.employee_id));
+
+        const employeeHours = filteredEmployees.map(emp => {
+            const loggedHours = relevantTimeLogs.filter(log => log.employee_id === emp.id).reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
+            return { utilization: emp.weekly_capacity_hours > 0 ? (loggedHours / emp.weekly_capacity_hours) : 0 };
+        });
+        
+        const totalLoggedHours = relevantTimeLogs.reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
+        const totalCapacityHours = filteredEmployees.reduce((sum, emp) => sum + emp.weekly_capacity_hours, 0);
+        const avgUtilization = totalCapacityHours > 0 ? (totalLoggedHours / totalCapacityHours * 100) : 0;
+
+        const overloadedCount = employeeHours.filter(emp => emp.utilization > 1.2).length;
+        const underutilizedCount = employeeHours.filter(emp => emp.utilization < 0.8).length;
+        const healthyCount = employeeHours.length - overloadedCount - underutilizedCount;
+
+        return { totalEmployees: filteredEmployees.length, avgUtilization: avgUtilization.toFixed(1), overloadedCount, underutilizedCount, healthyCount };
+    }, [filteredEmployees, filteredTimeLogsForDates]);
+    
+    const donutChartData = [{ label: 'Overloaded', value: kpis.overloadedCount }, { label: 'Healthy', value: kpis.healthyCount }, { label: 'Underutilized', value: kpis.underutilizedCount }];
+    
+    const taskTypeHoursData = useMemo(() => {
+        const taskTypeMap = new Map(tasks.map(t => [t.id, t.type]));
+        const hoursByType = new Map<string, number>();
+
+        filteredTimeLogsForDates.forEach(log => {
+            const type = taskTypeMap.get(log.task_id) || 'Uncategorized';
+            const currentHours = hoursByType.get(type) || 0;
+            hoursByType.set(type, currentHours + calculateDuration(log.start_time, log.end_time));
+        });
+
+        return Array.from(hoursByType.entries())
+            .map(([label, value]) => ({ label, value: Math.round(value) }))
+            .sort((a,b) => b.value - a.value);
+    }, [tasks, filteredTimeLogsForDates]);
+
+    const workloadData: WorkloadDataItem[] = useMemo(() => {
+        let currentEmployees = employees;
+        if (filters.team !== 'all') currentEmployees = currentEmployees.filter(emp => emp.team === filters.team);
+
+        const data = currentEmployees.map(emp => {
+            const loggedHours = filteredTimeLogsForDates.filter(log => log.employee_id === emp.id).reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
             const capacity = emp.weekly_capacity_hours;
             const utilization = capacity > 0 ? (loggedHours / capacity) * 100 : 0;
-            
             let status = 'Healthy';
             let barColor = 'var(--success-color)';
             if (utilization > 120) { status = 'Overloaded'; barColor = 'var(--danger-color)'; }
             else if (utilization < 80) { status = 'Underutilized'; barColor = 'var(--warning-color)'; }
-            
             return { id: emp.id, name: emp.name, team: emp.team, capacity, loggedHours: loggedHours.toFixed(1), utilization, status, barColor };
         });
 
-        if (filters.status !== 'all') {
-            return data.filter(item => item.status.toLowerCase() === filters.status);
-        }
-        return data;
-
-    }, [employees, filteredTimeLogs, filters.team, filters.status]);
+        return filters.status !== 'all' ? data.filter(item => item.status.toLowerCase() === filters.status) : data;
+    }, [employees, filteredTimeLogsForDates, filters.team, filters.status]);
 
     const sortedData = useMemo(() => {
         let sortableItems = [...workloadData];
         if (sortConfig !== null) {
             sortableItems.sort((a, b) => {
-                const aVal = a[sortConfig.key];
-                const bVal = b[sortConfig.key];
-                if (aVal < bVal) return sortConfig.direction === 'ascending' ? -1 : 1;
-                if (aVal > bVal) return sortConfig.direction === 'ascending' ? 1 : -1;
+                if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1;
+                if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1;
                 return 0;
             });
         }
         return sortableItems;
     }, [workloadData, sortConfig]);
 
-    const requestSort = (key) => {
+    const requestSort = (key: keyof WorkloadDataItem) => {
         let direction = 'ascending';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') { direction = 'descending'; }
+        if (sortConfig?.key === key && sortConfig.direction === 'ascending') { direction = 'descending'; }
         setSortConfig({ key, direction });
     };
-
-    const getSortIcon = (key) => {
+    const getSortIcon = (key: keyof WorkloadDataItem) => {
         if (!sortConfig || sortConfig.key !== key) return <span className="material-icons sort-icon" style={{ opacity: 0.3 }}>unfold_more</span>;
         return sortConfig.direction === 'ascending' ? <span className="material-icons sort-icon">expand_less</span> : <span className="material-icons sort-icon">expand_more</span>;
     };
-    
+
+    const chartColors = ['var(--danger-color)', 'var(--success-color)', 'var(--warning-color)'];
+    const barChartColors = ['var(--primary-color)', '#7986CB', '#C5CAE9', '#E8EAF6'];
+
     return (
-        <div className="table-container">
-             <div className="page-header">
-                <div className="page-filters">
-                    <div className="filter-group">
-                        <label>From</label>
-                        <input type="date" value={filters.from} onChange={e => setFilters(p => ({...p, from: e.target.value}))}/>
-                    </div>
-                    <div className="filter-group">
-                        <label>To</label>
-                        <input type="date" value={filters.to} onChange={e => setFilters(p => ({...p, to: e.target.value}))}/>
-                    </div>
-                    <div className="filter-group">
-                        <label>Team</label>
-                        <select value={filters.team} onChange={e => setFilters(p => ({...p, team: e.target.value}))}>
-                            <option value="all">All Teams</option>
-                            {teams.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                    </div>
-                    <div className="filter-group">
-                        <label>Status</label>
-                        <select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))}>
-                            <option value="all">All Statuses</option>
-                            <option value="overloaded">Overloaded</option>
-                            <option value="healthy">Healthy</option>
-                            <option value="underutilized">Underutilized</option>
-                        </select>
-                    </div>
-                </div>
+        <div>
+            <div className="page-filters" style={{marginBottom: '24px'}}>
+                 <div className="filter-group"><label>From</label><input type="date" value={filters.from} onChange={e => setFilters(p => ({...p, from: e.target.value}))}/></div>
+                 <div className="filter-group"><label>To</label><input type="date" value={filters.to} onChange={e => setFilters(p => ({...p, to: e.target.value}))}/></div>
+                 <div className="filter-group"><label>Team</label><select value={filters.team} onChange={e => setFilters(p => ({...p, team: e.target.value}))}><option value="all">All Teams</option>{teams.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                 <div className="filter-group"><label>Status</label><select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))}><option value="all">All Statuses</option><option value="overloaded">Overloaded</option><option value="healthy">Healthy</option><option value="underutilized">Underutilized</option></select></div>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th className="sortable" onClick={() => requestSort('name')}>Name{getSortIcon('name')}</th>
-                        <th className="sortable" onClick={() => requestSort('team')}>Team{getSortIcon('team')}</th>
-                        <th className="sortable" onClick={() => requestSort('capacity')}>Capacity (hrs){getSortIcon('capacity')}</th>
-                        <th className="sortable" onClick={() => requestSort('loggedHours')}>Logged (hrs){getSortIcon('loggedHours')}</th>
-                        <th className="sortable" onClick={() => requestSort('utilization')}>Utilization{getSortIcon('utilization')}</th>
-                        <th className="sortable" onClick={() => requestSort('status')}>Status{getSortIcon('status')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {sortedData.length === 0 ? (
-                        <tr><td colSpan={6} style={{ textAlign: 'center' }}>No employee data matches your filters.</td></tr>
-                    ) : (
-                        sortedData.map(item => (
+            
+            <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))'}}>
+                <div className="card"><h3>Total Employees</h3><div className="value">{kpis.totalEmployees}</div></div>
+                <div className="card"><h3>Avg. Utilization</h3><div className="value">{kpis.avgUtilization}<span className="unit">%</span></div></div>
+                <div className="card"><h3>Overloaded</h3><div className="value" style={{color: 'var(--danger-color)'}}>{kpis.overloadedCount}</div></div>
+                <div className="card"><h3>Underutilized</h3><div className="value" style={{color: 'var(--warning-color)'}}>{kpis.underutilizedCount}</div></div>
+            </div>
+
+            <div className="insights-grid">
+                <div className="card"><h3>Utilization Status</h3><DonutChart data={donutChartData} colors={chartColors} /></div>
+                <div className="card"><h3>Hours by Task Type</h3>{taskTypeHoursData.length > 0 ? <BarChart data={taskTypeHoursData} colors={barChartColors} /> : <p>No hours logged for any task type yet.</p>}</div>
+            </div>
+
+            <div className="table-container">
+                <h3>Workload Details</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th className="sortable" onClick={() => requestSort('name')}>Name{getSortIcon('name')}</th>
+                            <th className="sortable" onClick={() => requestSort('team')}>Team{getSortIcon('team')}</th>
+                            <th className="sortable" onClick={() => requestSort('capacity')}>Capacity (hrs){getSortIcon('capacity')}</th>
+                            <th className="sortable" onClick={() => requestSort('loggedHours')}>Logged (hrs){getSortIcon('loggedHours')}</th>
+                            <th className="sortable" onClick={() => requestSort('utilization')}>Utilization{getSortIcon('utilization')}</th>
+                            <th className="sortable" onClick={() => requestSort('status')}>Status{getSortIcon('status')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sortedData.map(item => (
                             <tr key={item.id} className="clickable-row" onClick={() => onEmployeeSelect(item.id)}>
                                 <td>{item.name}</td>
                                 <td>{item.team}</td>
@@ -1018,37 +986,58 @@ const WorkloadView = ({ employees, timeLogs, onEmployeeSelect }) => {
                                 <td>{item.loggedHours}</td>
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                        <div className="utilization-bar-container">
-                                            <div className="utilization-bar" style={{ width: `${Math.min(item.utilization, 100)}%`, backgroundColor: item.barColor }} />
-                                        </div>
+                                        <div className="utilization-bar-container"><div className="utilization-bar" style={{ width: `${Math.min(item.utilization, 100)}%`, backgroundColor: item.barColor }} /></div>
                                         <span>{item.utilization.toFixed(1)}%</span>
                                     </div>
                                 </td>
                                 <td><span className={`status-tag status-${item.status.toLowerCase().replace(/\s/g, '')}`}>{item.status}</span></td>
                             </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
 
-const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) => {
+interface DraggingState {
+    log: TimeLog;
+    actionType: 'drag' | 'resize-top' | 'resize-bottom';
+    startY: number;
+    timelineRect: DOMRect;
+}
+interface MyDayViewProps {
+    loggedInEmployeeId: number;
+    timeLogs: TimeLog[];
+    tasks: Task[];
+    onSave: (item: Partial<TimeLog>) => Promise<void>;
+    onDelete: (id: number) => Promise<void>;
+}
+const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }: MyDayViewProps) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentItem, setCurrentItem] = useState(null);
-    const [viewMode, setViewMode] = useState('day'); // 'day' or 'week'
-    const [activeTimer, setActiveTimer] = useState(null); // { gap, startTime }
+    const [currentItem, setCurrentItem] = useState<Partial<TimeLog> & { task_title?: string } | null>(null);
+    const [viewMode, setViewMode] = useState('day');
+    const [activeTimer, setActiveTimer] = useState<{ gap: any; startTime: number } | null>(null);
     const [elapsedTime, setElapsedTime] = useState(0);
-    const [draggingEvent, setDraggingEvent] = useState(null);
-    const timelineRef = useRef(null);
+    const [draggingEvent, setDraggingEvent] = useState<DraggingState | null>(null);
+    const timelineRef = useRef<HTMLDivElement>(null);
 
     const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t.title])), [tasks]);
 
-    // Timer logic
+    const myTasks = useMemo(() => {
+        return tasks.filter(t => t.assigned_employee_id === loggedInEmployeeId && t.status !== 'Completed');
+    }, [tasks, loggedInEmployeeId]);
+
+    const WORK_START_HOUR = 9;
+    const WORK_END_HOUR = 18;
+    const TOTAL_HOURS = WORK_END_HOUR - WORK_START_HOUR;
+    const TOTAL_MINUTES = TOTAL_HOURS * 60;
+    const WORK_START_MINUTES = WORK_START_HOUR * 60;
+    const WORK_END_MINUTES = WORK_END_HOUR * 60;
+
     useEffect(() => {
-        let interval;
+        let interval: any;
         if (activeTimer) {
             interval = setInterval(() => {
                 setElapsedTime(Date.now() - activeTimer.startTime);
@@ -1057,12 +1046,12 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
         return () => clearInterval(interval);
     }, [activeTimer]);
 
-    const handleStartTimer = (gap) => {
+    const handleStartTimer = (gap: any) => {
         setActiveTimer({ gap, startTime: Date.now() });
     };
 
     const handleStopTimer = () => {
-        const endTime = new Date(activeTimer.startTime + elapsedTime);
+        if (!activeTimer) return;
         const startMinutes = timeToMinutes(activeTimer.gap.start_time);
         const endMinutes = startMinutes + Math.round(elapsedTime / 60000);
         
@@ -1071,14 +1060,13 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
             start_time: activeTimer.gap.start_time,
             end_time: minutesToTime(endMinutes),
             notes: '',
-            id: Date.now()
         });
         setIsModalOpen(true);
         setActiveTimer(null);
         setElapsedTime(0);
     };
 
-    const formatElapsedTime = (ms) => {
+    const formatElapsedTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000);
         const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
         const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
@@ -1091,16 +1079,8 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
             .filter(log => log.employee_id === loggedInEmployeeId && log.date === selectedDate)
             .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
     }, [timeLogs, loggedInEmployeeId, selectedDate]);
-    
-    const WORK_START_HOUR = 9; // 9 AM
-    const WORK_END_HOUR = 18; // 6 PM
-    const TOTAL_HOURS = WORK_END_HOUR - WORK_START_HOUR;
-    const TOTAL_MINUTES = TOTAL_HOURS * 60;
 
     const { timeGaps, summary } = useMemo(() => {
-        const WORK_START_MINUTES = WORK_START_HOUR * 60;
-        const WORK_END_MINUTES = WORK_END_HOUR * 60;
-
         let loggedMinutes = 0;
         let productiveMinutes = 0;
 
@@ -1115,7 +1095,7 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
             }
         });
 
-        const gaps = [];
+        const gaps: { start: number, end: number }[] = [];
         let lastLogEndTime = WORK_START_MINUTES;
 
         dailyLogs.forEach(log => {
@@ -1146,1015 +1126,854 @@ const MyDayView = ({ loggedInEmployeeId, timeLogs, tasks, onSave, onDelete }) =>
                 productive: (productiveMinutes / 60).toFixed(2),
             }
         };
-    }, [dailyLogs, taskMap]);
+    }, [dailyLogs, taskMap, WORK_START_MINUTES, WORK_END_MINUTES]);
 
-    const handleGapClick = (gap) => {
+    const handleGapClick = (gap: { start_time: string, end_time: string }) => {
         setCurrentItem({ 
             task_title: '',
             start_time: gap.start_time,
             end_time: gap.end_time,
             notes: '',
-            id: Date.now() // This will be used to create a new item
         });
         setIsModalOpen(true);
     };
     
-    const handleEdit = (item) => {
+    const handleEdit = (item: TimeLog) => {
         const taskTitle = taskMap.get(item.task_id) || '';
         setCurrentItem({ ...item, task_title: taskTitle });
         setIsModalOpen(true);
     };
 
-    const handleSave = (itemData) => {
-        onSave(itemData);
+    const handleTaskClick = (task: Task) => {
+        setCurrentItem({ 
+            task_title: task.title,
+            start_time: '',
+            end_time: '',
+            notes: '',
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleSave = async (itemData: Partial<TimeLog>) => {
+        await onSave(itemData);
         setIsModalOpen(false);
         setDraggingEvent(null);
     };
 
-    const changeDate = (offset) => {
+    const changeDate = (offset: number) => {
         const currentDate = new Date(selectedDate);
         currentDate.setDate(currentDate.getDate() + offset);
         setSelectedDate(currentDate.toISOString().split('T')[0]);
     };
     
-    // Drag and Drop Logic
-    const handleMouseDown = (e, log, type) => {
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, log: TimeLog, actionType = 'drag') => {
+        if (activeTimer || !timelineRef.current) return;
         e.preventDefault();
         e.stopPropagation();
-        
-        const timelineRect = timelineRef.current.getBoundingClientRect();
-        const initialY = e.clientY - timelineRect.top;
-        const initialStartMinutes = timeToMinutes(log.start_time);
-        const initialEndMinutes = timeToMinutes(log.end_time);
 
+        const timelineRect = timelineRef.current.getBoundingClientRect();
         setDraggingEvent({
-            id: log.id,
-            type,
-            initialY,
-            initialStartMinutes,
-            initialEndMinutes,
             log,
+            actionType: actionType as 'drag' | 'resize-top' | 'resize-bottom',
+            startY: e.clientY,
+            timelineRect,
         });
     };
-
-    const handleMouseMove = useCallback((e) => {
-        if (!draggingEvent) return;
-
-        const timelineRect = timelineRef.current.getBoundingClientRect();
-        const currentY = e.clientY - timelineRect.top;
-        const deltaY = currentY - draggingEvent.initialY;
-        const deltaMinutes = Math.round(deltaY / (timelineRect.height / TOTAL_MINUTES));
-
-        let newStartMinutes = draggingEvent.initialStartMinutes;
-        let newEndMinutes = draggingEvent.initialEndMinutes;
-        const duration = draggingEvent.initialEndMinutes - draggingEvent.initialStartMinutes;
-
-        if (draggingEvent.type === 'move') {
-            newStartMinutes = draggingEvent.initialStartMinutes + deltaMinutes;
-            newEndMinutes = draggingEvent.initialEndMinutes + deltaMinutes;
-        } else if (draggingEvent.type === 'resize-top') {
-            newStartMinutes = draggingEvent.initialStartMinutes + deltaMinutes;
-        } else if (draggingEvent.type === 'resize-bottom') {
-            newEndMinutes = draggingEvent.initialEndMinutes + deltaMinutes;
-        }
-        
-        // Clamp to timeline boundaries
-        const WORK_START_MINUTES = WORK_START_HOUR * 60;
-        const WORK_END_MINUTES = WORK_END_HOUR * 60;
-
-        newStartMinutes = Math.max(WORK_START_MINUTES, Math.min(newStartMinutes, WORK_END_MINUTES - 1));
-        newEndMinutes = Math.max(newStartMinutes + 1, Math.min(newEndMinutes, WORK_END_MINUTES));
-        
-        if (draggingEvent.type === 'move' && newEndMinutes > WORK_END_MINUTES) {
-            newEndMinutes = WORK_END_MINUTES;
-            newStartMinutes = newEndMinutes - duration;
-        }
-        if (draggingEvent.type === 'resize-top' && newStartMinutes >= newEndMinutes) {
-            newStartMinutes = newEndMinutes - 1;
-        }
-
-
-        const updatedLog = {
-            ...draggingEvent.log,
-            start_time: minutesToTime(newStartMinutes),
-            end_time: minutesToTime(newEndMinutes),
-        };
-
-        // Optimistic update for smooth UI
-        setDraggingEvent(prev => ({ ...prev, log: updatedLog }));
-
-    }, [draggingEvent, TOTAL_MINUTES]);
-
-    const handleMouseUp = useCallback(() => {
-        if (draggingEvent) {
-            const taskTitle = taskMap.get(draggingEvent.log.task_id) || '';
-            handleSave({ ...draggingEvent.log, task_title: taskTitle });
-        }
-    }, [draggingEvent, taskMap, onSave]);
-
+    
+    const onSaveRef = useRef(onSave);
+    useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+    
     useEffect(() => {
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+        if (!draggingEvent) return;
+        const handleMouseMove = (e: MouseEvent) => {
+            const dy = e.clientY - draggingEvent.startY;
+            const minutesPerPixel = TOTAL_MINUTES / draggingEvent.timelineRect.height;
+            const minuteChange = Math.round((dy * minutesPerPixel) / 15) * 15;
+            let newStartTime: string | undefined, newEndTime: string | undefined;
+    
+            if (draggingEvent.actionType === 'drag') {
+                const newStartMinutes = timeToMinutes(draggingEvent.log.start_time) + minuteChange;
+                const durationMinutes = calculateDuration(draggingEvent.log.start_time, draggingEvent.log.end_time) * 60;
+                newStartTime = minutesToTime(Math.max(WORK_START_MINUTES, Math.min(WORK_END_MINUTES - durationMinutes, newStartMinutes)));
+                newEndTime = minutesToTime(timeToMinutes(newStartTime) + durationMinutes);
+            } else if (draggingEvent.actionType === 'resize-bottom') {
+                newStartTime = draggingEvent.log.start_time;
+                const originalEndMinutes = timeToMinutes(draggingEvent.log.end_time);
+                const newEndMinutes = originalEndMinutes + minuteChange;
+                newEndTime = minutesToTime(Math.min(WORK_END_MINUTES, Math.max(timeToMinutes(newStartTime) + 15, newEndMinutes)));
+            } else if (draggingEvent.actionType === 'resize-top') {
+                newEndTime = draggingEvent.log.end_time;
+                const originalStartMinutes = timeToMinutes(draggingEvent.log.start_time);
+                const newStartMinutes = originalStartMinutes + minuteChange;
+                newStartTime = minutesToTime(Math.max(WORK_START_MINUTES, Math.min(timeToMinutes(newEndTime) - 15, newStartMinutes)));
+            }
+    
+            const draggedElement = document.getElementById(`event-${draggingEvent.log.id}`);
+            if (draggedElement && newStartTime && newEndTime) {
+                const newTop = (timeToMinutes(newStartTime) - WORK_START_MINUTES) * (draggingEvent.timelineRect.height / TOTAL_MINUTES);
+                const newHeight = calculateDuration(newStartTime, newEndTime) * 60 * (draggingEvent.timelineRect.height / TOTAL_MINUTES);
+                draggedElement.style.top = `${newTop}px`;
+                draggedElement.style.height = `${newHeight}px`;
+            }
         };
-    }, [handleMouseMove, handleMouseUp]);
     
-    const logsToDisplay = draggingEvent
-        ? dailyLogs.map(log => log.id === draggingEvent.id ? draggingEvent.log : log)
-        : dailyLogs;
+        const handleMouseUp = () => {
+            const draggedElement = document.getElementById(`event-${draggingEvent.log.id}`);
+            if (draggedElement) {
+                const topOffset = parseFloat(draggedElement.style.top);
+                const height = parseFloat(draggedElement.style.height);
+                const minutesPerPixel = TOTAL_MINUTES / draggingEvent.timelineRect.height;
+                const newStartMinutes = Math.round(topOffset * minutesPerPixel) + WORK_START_MINUTES;
+                const newDurationMinutes = Math.round(height * minutesPerPixel);
+                const newStartTime = minutesToTime(newStartMinutes);
+                const newEndTime = minutesToTime(newStartMinutes + newDurationMinutes);
     
+                if (timeToMinutes(newStartTime) < timeToMinutes(newEndTime)) {
+                    onSaveRef.current({ ...draggingEvent.log, start_time: newStartTime, end_time: newEndTime });
+                }
+            }
+            setDraggingEvent(null);
+        };
+    
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [draggingEvent, TOTAL_MINUTES, WORK_START_MINUTES, WORK_END_MINUTES]);
+
+    interface TimeLogModalProps {
+        item: Partial<TimeLog> & { task_title?: string } | null;
+        onClose: () => void;
+        onSave: (item: Partial<TimeLog>) => void;
+        onDelete: (id: number) => void;
+        tasks: Task[];
+        employeeId: number;
+    }
+    const TimeLogModal = ({ item, onClose, onSave, onDelete, tasks, employeeId }: TimeLogModalProps) => {
+        const [formData, setFormData] = useState({
+            task_id: item?.task_id || '',
+            start_time: item?.start_time || '',
+            end_time: item?.end_time || '',
+            notes: item?.notes || '',
+        });
+        const [selectedTaskTitle, setSelectedTaskTitle] = useState(item?.task_title || '');
+
+        useEffect(() => {
+            if (selectedTaskTitle && !formData.task_id) {
+                const foundTask = tasks.find(t => t.title === selectedTaskTitle);
+                if (foundTask) setFormData(prev => ({ ...prev, task_id: foundTask.id as any }));
+            }
+        }, [selectedTaskTitle, formData.task_id, tasks]);
+
+        const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+            const { name, value } = e.target;
+            setFormData(prev => ({ ...prev, [name]: value }));
+        };
+        
+        const handleTaskChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+             const taskId = e.target.value;
+             handleChange(e);
+             const task = tasks.find(t => t.id === parseInt(taskId));
+             if (task) setSelectedTaskTitle(task.title);
+        }
+
+        const handleSubmit = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!formData.task_id || !formData.start_time || !formData.end_time) return;
+            onSave({ ...item, employee_id: employeeId, date: selectedDate, ...formData, task_id: parseInt(formData.task_id as string) });
+        };
+
+        const availableTasks = tasks.filter(t => t.status !== 'Completed');
+
+        return (
+            <Modal title={item?.id ? 'Edit Time Log' : 'Add Time Log'} onClose={onClose}>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label htmlFor="task_id">Task</label>
+                        <select id="task_id" name="task_id" value={formData.task_id} onChange={handleTaskChange} required>
+                            <option value="" disabled>Select a task</option>
+                            {availableTasks.map(task => <option key={task.id} value={task.id}>{task.title}</option>)}
+                        </select>
+                    </div>
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="form-group"><label htmlFor="start_time">Start Time</label><input type="time" id="start_time" name="start_time" value={formData.start_time} onChange={handleChange} required step="900" /></div>
+                        <div className="form-group"><label htmlFor="end_time">End Time</label><input type="time" id="end_time" name="end_time" value={formData.end_time} onChange={handleChange} required step="900" /></div>
+                    </div>
+                    <div className="form-group"><label htmlFor="notes">Notes (Optional)</label><textarea id="notes" name="notes" value={formData.notes} onChange={handleChange} rows={3}></textarea></div>
+                    <div className="modal-actions">
+                        {item?.id && <button type="button" className="btn btn-danger" onClick={() => onDelete(item.id!)}>Delete</button>}
+                        <button type="button" className="btn" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </Modal>
+        );
+    };
+
+    const DayView = () => (
+        <div className="my-day-view">
+            <div className="card">
+                <h3>Today's Timeline ({new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })})</h3>
+                 <div className="timeline-container" ref={timelineRef}>
+                    {Array.from({ length: TOTAL_HOURS + 1 }).map((_, i) => {
+                        const hour = WORK_START_HOUR + i;
+                        const top = (i * 60) * (540 / TOTAL_MINUTES);
+                        return (
+                            <div key={hour} style={{ position: 'absolute', top: `${top}px`, width: '100%' }}>
+                                <div className="timeline-hour-marker">{`${hour % 12 === 0 ? 12 : hour % 12} ${hour < 12 || hour === 24 ? 'AM' : 'PM'}`}</div>
+                                <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: 0 }} />
+                            </div>
+                        );
+                    })}
+                    {dailyLogs.map(log => {
+                        const top = (timeToMinutes(log.start_time) - WORK_START_MINUTES) * (540 / TOTAL_MINUTES);
+                        const height = calculateDuration(log.start_time, log.end_time) * 60 * (540 / TOTAL_MINUTES);
+                        const isBreak = taskMap.get(log.task_id)?.toLowerCase().includes('break');
+                        if (height <= 0) return null;
+                        return (
+                            <div id={`event-${log.id}`} key={log.id} className={`timeline-event ${isBreak ? 'is-break' : ''} ${draggingEvent?.log.id === log.id ? 'is-dragging' : ''}`} style={{ top: `${top}px`, height: `${height}px` }} onMouseDown={(e) => handleMouseDown(e, log, 'drag')} onClick={() => handleEdit(log)}>
+                                <strong>{taskMap.get(log.task_id) || 'Untitled Task'}</strong>
+                                <span>{log.start_time} - {log.end_time}</span>
+                                {log.notes && <span style={{ fontStyle: 'italic', opacity: 0.7, marginTop: '4px', display: 'block' }}>{log.notes}</span>}
+                                {height > 20 && <>
+                                    <div className="resize-handle top" onMouseDown={(e) => handleMouseDown(e, log, 'resize-top')}></div>
+                                    <div className="resize-handle bottom" onMouseDown={(e) => handleMouseDown(e, log, 'resize-bottom')}></div>
+                                </>}
+                            </div>
+                        );
+                    })}
+                     {timeGaps.map(gap => {
+                        const top = (timeToMinutes(gap.start_time) - WORK_START_MINUTES) * (540 / TOTAL_MINUTES);
+                        const height = (timeToMinutes(gap.end_time) - timeToMinutes(gap.start_time)) * (540 / TOTAL_MINUTES);
+                        const isTimerActiveForThisGap = activeTimer && activeTimer.gap.start_time === gap.start_time;
+                        if (height <= 0) return null;
+                        return (
+                            <button key={gap.id} className="timeline-gap" style={{ top: `${top}px`, height: `${height}px` }} onClick={() => !activeTimer && handleGapClick(gap)}>
+                                {isTimerActiveForThisGap ? (
+                                    <>
+                                        <div className="timeline-gap-timer">{formatElapsedTime(elapsedTime)}</div>
+                                        <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleStopTimer(); }}>Stop & Log</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-icons">add_circle</span>
+                                        <span>Add Log</span>
+                                        {height > 50 && <button className="btn" onClick={(e) => { e.stopPropagation(); handleStartTimer(gap); }}>Start Timer</button>}
+                                    </>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
+                 <div className="card">
+                    <h3>My Tasks ({myTasks.length})</h3>
+                     {myTasks.length > 0 ? (
+                        <div className="activity-list my-tasks-list" style={{ maxHeight: '200px', overflowY: 'auto'}}>
+                            <ul>{myTasks.map(task => (
+                                <li key={task.id} className="activity-item" onClick={() => handleTaskClick(task)}>
+                                    <div className="activity-item-info">
+                                        <span className="title">{task.title}</span>
+                                        <span className="meta">{task.type} - Complexity: {task.complexity}</span>
+                                    </div>
+                                    <button className="btn-icon" aria-label={`Log time for ${task.title}`}><span className="material-icons">add_alarm</span></button>
+                                </li>
+                            ))}</ul>
+                        </div>
+                    ) : (
+                        <p>No pending tasks assigned. Great job!</p>
+                    )}
+                </div>
+                <div className="card">
+                    <h3>Day Summary</h3>
+                    <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                        <div><h3>Logged</h3><div className="value">{summary.logged}<span className="unit">h</span></div></div>
+                        <div><h3>Productive</h3><div className="value">{summary.productive}<span className="unit">h</span></div></div>
+                        <div><h3>Unlogged</h3><div className="value">{summary.unlogged}<span className="unit">h</span></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div>
+            <div className="my-day-controls">
+                <button className="btn-icon" onClick={() => changeDate(-1)}><span className="material-icons">chevron_left</span></button>
+                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }}/>
+                <button className="btn-icon" onClick={() => changeDate(1)}><span className="material-icons">chevron_right</span></button>
+                <button className="btn" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>Today</button>
+            </div>
+            {viewMode === 'day' && <DayView />}
+            {isModalOpen && <TimeLogModal item={currentItem} onClose={() => setIsModalOpen(false)} onSave={handleSave} onDelete={onDelete} tasks={tasks} employeeId={loggedInEmployeeId} />}
+        </div>
+    );
+};
+
+interface ProjectDetailViewProps {
+    project: Task;
+    timeLogs: TimeLog[];
+    employees: Employee[];
+    onBack: () => void;
+    onDelete: (id: number) => Promise<void>;
+}
+const ProjectDetailView = ({ project, timeLogs, employees, onBack, onDelete }: ProjectDetailViewProps) => {
+    const projectLogs = useMemo(() => {
+        return timeLogs
+            .filter(log => log.task_id === project.id)
+            .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() || timeToMinutes(b.start_time) - timeToMinutes(a.start_time));
+    }, [timeLogs, project.id]);
+    
+    const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.name])), [employees]);
+
+    const totalHours = useMemo(() => {
+        return projectLogs.reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
+    }, [projectLogs]);
+
+    const assignedEmployee = employeeMap.get(project.assigned_employee_id) || 'Unassigned';
+
+    return (
+        <div className="card">
+             <div className="project-detail-header">
+                <div className="project-detail-info">
+                    <button onClick={onBack} className="btn-icon" style={{marginBottom: '8px'}}><span className="material-icons">arrow_back</span></button>
+                    <h2>{project.title}</h2>
+                    <div className="project-detail-meta">
+                        <span><strong>Status:</strong> {project.status}</span>
+                        <span><strong>Type:</strong> {project.type}</span>
+                        <span><strong>Complexity:</strong> {project.complexity}/5</span>
+                        <span><strong>Assigned to:</strong> {assignedEmployee}</span>
+                    </div>
+                </div>
+                <div className="page-actions">
+                     <button className="btn btn-danger" onClick={() => onDelete(project.id)}>Delete Project</button>
+                </div>
+            </div>
+
+            <h3>Time Logs ({totalHours.toFixed(2)} hrs)</h3>
+            <div className="table-container">
+                 <table>
+                    <thead>
+                        <tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Duration</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                         {projectLogs.length > 0 ? projectLogs.map(log => (
+                            <tr key={log.id}>
+                                <td>{new Date(log.date).toLocaleDateString()}</td>
+                                <td>{employeeMap.get(log.employee_id) || 'Unknown'}</td>
+                                <td>{log.start_time}</td>
+                                <td>{log.end_time}</td>
+                                <td>{calculateDuration(log.start_time, log.end_time).toFixed(2)}h</td>
+                                <td>{log.notes}</td>
+                            </tr>
+                        )) : (
+                            <tr><td colSpan={6} style={{textAlign: 'center'}}>No time has been logged for this project yet.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+interface ProjectsViewProps {
+    tasks: Task[];
+    employees: Employee[];
+    timeLogs: TimeLog[];
+    onSave: (task: Partial<Task>) => Promise<void>;
+    onDelete: (id: number) => Promise<void>;
+}
+const ProjectsView = ({ tasks, employees, timeLogs, onSave, onDelete }: ProjectsViewProps) => {
+    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+    const [filters, setFilters] = useState({ employee: 'all', status: 'all' });
+    const [sortConfig, setSortConfig] = useState<{key: keyof Task, direction: string}>({ key: 'title', direction: 'ascending' });
+
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            if (filters.employee !== 'all' && task.assigned_employee_id !== parseInt(filters.employee)) return false;
+            if (filters.status !== 'all' && task.status !== filters.status) return false;
+            return true;
+        });
+    }, [tasks, filters]);
+
+    const sortedTasks = useMemo(() => {
+        return [...filteredTasks].sort((a, b) => {
+            const valA = a[sortConfig.key];
+            const valB = b[sortConfig.key];
+            if (valA === null || valA === undefined) return 1;
+            if (valB === null || valB === undefined) return -1;
+            if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredTasks, sortConfig]);
+
+    const requestSort = (key: keyof Task) => {
+        let direction = 'ascending';
+        if (sortConfig?.key === key && sortConfig.direction === 'ascending') { direction = 'descending'; }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: keyof Task) => {
+        if (!sortConfig || sortConfig.key !== key) return <span className="material-icons sort-icon" style={{ opacity: 0.3 }}>unfold_more</span>;
+        return sortConfig.direction === 'ascending' ? <span className="material-icons sort-icon">expand_less</span> : <span className="material-icons sort-icon">expand_more</span>;
+    };
+
+    const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.name])), [employees]);
+    
+    const projectHours = useMemo(() => {
+        const hoursMap = new Map<number, number>();
+        timeLogs.forEach(log => {
+            const currentHours = hoursMap.get(log.task_id) || 0;
+            hoursMap.set(log.task_id, currentHours + calculateDuration(log.start_time, log.end_time));
+        });
+        return hoursMap;
+    }, [timeLogs]);
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [currentItem, setCurrentItem] = useState<Partial<Task> | null>(null);
+
+    const handleAdd = () => {
+        setCurrentItem({ title: '', type: '', complexity: 1, status: 'Not Started', assigned_employee_id: null });
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (task: Task) => {
+        setCurrentItem(task);
+        setIsModalOpen(true);
+    };
+
+    const handleSave = async (itemData: Partial<Task>) => {
+        await onSave(itemData);
+        setIsModalOpen(false);
+    };
+
+    const selectedProject = tasks.find(t => t.id === selectedProjectId);
+
+    if (selectedProject) {
+        return <ProjectDetailView project={selectedProject} timeLogs={timeLogs} employees={employees} onBack={() => setSelectedProjectId(null)} onDelete={onDelete}/>
+    }
+
     return (
         <div>
             <div className="page-header">
                 <div className="page-filters">
-                    <button className="btn-icon" onClick={() => changeDate(-1)}><span className="material-icons">chevron_left</span></button>
-                    <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
-                    <button className="btn-icon" onClick={() => changeDate(1)}><span className="material-icons">chevron_right</span></button>
+                    <div className="filter-group">
+                        <label>Assigned To</label>
+                        <select value={filters.employee} onChange={e => setFilters(p => ({...p, employee: e.target.value}))}>
+                            <option value="all">All Employees</option>
+                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="filter-group">
+                        <label>Status</label>
+                        <select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))}>
+                            <option value="all">All Statuses</option>
+                            <option value="Not Started">Not Started</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
                 </div>
-                <div className="my-day-controls">
-                    <button className={`btn ${viewMode === 'day' ? 'btn-primary' : ''}`} onClick={() => setViewMode('day')}>Day</button>
-                    <button className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`} onClick={() => setViewMode('week')}>Week</button>
-                </div>
-            </div>
-
-             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '24px' }}>
-                <div className="card">
-                    <h3>Logged</h3>
-                    <div className="value">{summary.logged}<span className="unit">hrs</span></div>
-                </div>
-                <div className="card">
-                    <h3>Unlogged</h3>
-                    <div className="value">{summary.unlogged}<span className="unit">hrs</span></div>
-                </div>
-                <div className="card">
-                    <h3>Productive</h3>
-                    <div className="value">{summary.productive}<span className="unit">hrs</span></div>
+                <div className="page-actions">
+                    <button className="btn btn-primary" onClick={handleAdd}><span className="material-icons">add</span> Add Project</button>
                 </div>
             </div>
-
-            {viewMode === 'day' ? (
-                <div className="my-day-view">
-                    <div className="card">
-                        <h3>Timeline</h3>
-                        <div className="timeline-container" ref={timelineRef}>
-                            {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => WORK_START_HOUR + i).map(hour => (
-                                <div key={hour} className="timeline-hour-marker" style={{ top: `${((hour - WORK_START_HOUR) / TOTAL_HOURS) * 100}%` }}>
-                                    {`${hour}:00`}
-                                </div>
+            {sortedTasks.length > 0 ? (
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th className="sortable" onClick={() => requestSort('title')}>Title {getSortIcon('title')}</th>
+                                <th className="sortable" onClick={() => requestSort('status')}>Status {getSortIcon('status')}</th>
+                                <th className="sortable" onClick={() => requestSort('assigned_employee_id')}>Assigned To {getSortIcon('assigned_employee_id')}</th>
+                                <th>Hours Logged</th>
+                                <th className="sortable" onClick={() => requestSort('complexity')}>Complexity {getSortIcon('complexity')}</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedTasks.map(task => (
+                                <tr key={task.id} className="clickable-row" onClick={() => setSelectedProjectId(task.id)}>
+                                    <td>{task.title}</td>
+                                    <td>{task.status}</td>
+                                    <td>{employeeMap.get(task.assigned_employee_id) || 'Unassigned'}</td>
+                                    <td>{(projectHours.get(task.id) || 0).toFixed(2)}h</td>
+                                    <td>{task.complexity}</td>
+                                    <td onClick={e => e.stopPropagation()}>
+                                        <div className="actions">
+                                            <button className="btn-icon" onClick={() => handleEdit(task)}><span className="material-icons">edit</span></button>
+                                            <button className="btn-icon" onClick={() => onDelete(task.id)}><span className="material-icons">delete</span></button>
+                                        </div>
+                                    </td>
+                                </tr>
                             ))}
-                            {timeGaps.map((gap, index) => {
-                                const startMinutes = timeToMinutes(gap.start_time) - (WORK_START_HOUR * 60);
-                                const endMinutes = timeToMinutes(gap.end_time) - (WORK_START_HOUR * 60);
-                                const top = (startMinutes / TOTAL_MINUTES) * 100;
-                                const height = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
-
-                                const isTimerActiveForThisGap = activeTimer && activeTimer.gap.id === gap.id;
-
-                                return (
-                                    <div key={`gap-${index}`} className="timeline-gap" style={{ top: `${top}%`, height: `${height}%` }} onClick={() => !activeTimer && handleGapClick(gap)}>
-                                        {isTimerActiveForThisGap ? (
-                                            <>
-                                                <span className="timeline-gap-timer">{formatElapsedTime(elapsedTime)}</span>
-                                                <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleStopTimer();}}>Stop</button>
-                                            </>
-                                        ) : !activeTimer && (
-                                            <>
-                                                <span className="material-icons">add_circle_outline</span>
-                                                <span>{calculateDuration(gap.start_time, gap.end_time).toFixed(2)} hrs</span>
-                                                <button className="btn" onClick={(e) => { e.stopPropagation(); handleStartTimer(gap);}}>▶ Start</button>
-                                            </>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            {logsToDisplay.map(log => {
-                                const startMinutes = timeToMinutes(log.start_time) - (WORK_START_HOUR * 60);
-                                const endMinutes = timeToMinutes(log.end_time) - (WORK_START_HOUR * 60);
-                                const top = (startMinutes / TOTAL_MINUTES) * 100;
-                                const height = ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100;
-                                const isBreak = (taskMap.get(log.task_id) || '').toLowerCase().includes('break');
-                                const isDragging = draggingEvent && draggingEvent.id === log.id;
-
-                                return (
-                                    <div key={log.id} className={`timeline-event ${isBreak ? 'is-break' : ''} ${isDragging ? 'is-dragging': ''}`} style={{ top: `${top}%`, height: `${Math.max(height, 1)}%` }} title={`${log.start_time} - ${log.end_time}: ${taskMap.get(log.task_id)}`} onMouseDown={(e) => handleMouseDown(e, log, 'move')}>
-                                        <div className="resize-handle top" onMouseDown={(e) => handleMouseDown(e, log, 'resize-top')}></div>
-                                        <strong>{taskMap.get(log.task_id)}</strong>
-                                        <span>{log.notes}</span>
-                                        <div className="resize-handle bottom" onMouseDown={(e) => handleMouseDown(e, log, 'resize-bottom')}></div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <div className="card">
-                        <h3>Activities</h3>
-                        <div className="activity-list">
-                            {dailyLogs.length === 0 ? <p>No activities logged. Click a gap in the timeline to start.</p> : (
-                                <ul>
-                                    {dailyLogs.map(log => (
-                                        <li key={log.id} className="activity-item">
-                                            <div className="activity-item-info">
-                                                <span className="title">{taskMap.get(log.task_id) || 'Unknown Task'}</span>
-                                                <span className="meta">{log.start_time} - {log.end_time} ({calculateDuration(log.start_time, log.end_time).toFixed(2)} hrs)</span>
-                                                {log.notes && <p className="notes">"{log.notes}"</p>}
-                                            </div>
-                                            <div className="actions">
-                                                <button className="btn-icon" onClick={() => handleEdit(log)}><span className="material-icons">edit</span></button>
-                                                <button className="btn-icon" onClick={() => onDelete(log.id, "Time Logs")}><span className="material-icons" style={{color: 'var(--danger-color)'}}>delete</span></button>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             ) : (
-                <WeekTimeline selectedDate={selectedDate} timeLogs={timeLogs} loggedInEmployeeId={loggedInEmployeeId} taskMap={taskMap} />
+                <EmptyState
+                    icon="folder_off"
+                    title="No Projects Found"
+                    message="There are no projects matching your current filters. Try adjusting them or add a new project."
+                    action={<button className="btn btn-primary" onClick={handleAdd}><span className="material-icons">add</span> Add Project</button>}
+                />
             )}
-            {isModalOpen && (
-                <Modal title={currentItem && timeLogs.some(l => l.id === currentItem.id) ? 'Edit Activity' : 'Add Activity'} onClose={() => setIsModalOpen(false)}>
-                    <ActivityForm 
-                        item={currentItem} 
-                        onSave={handleSave} 
-                        onCancel={() => setIsModalOpen(false)}
-                        tasks={tasks}
-                        employeeId={loggedInEmployeeId}
-                        date={selectedDate}
-                    />
-                </Modal>
-            )}
-        </div>
-    )
-};
-
-const WeekTimeline = ({ selectedDate, timeLogs, loggedInEmployeeId, taskMap }) => {
-    const WORK_START_HOUR = 9;
-    const TOTAL_HOURS = 9;
-
-    const weekData = useMemo(() => {
-        const startOfWeek = new Date(selectedDate);
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Assuming Sunday is the start of the week
-        
-        const days = [];
-        for (let i = 0; i < 7; i++) {
-            const day = new Date(startOfWeek);
-            day.setDate(day.getDate() + i);
-            const dateString = day.toISOString().split('T')[0];
-            const logs = timeLogs
-                .filter(log => log.employee_id === loggedInEmployeeId && log.date === dateString)
-                .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
-            days.push({
-                date: day,
-                logs: logs,
-            });
-        }
-        return days;
-    }, [selectedDate, timeLogs, loggedInEmployeeId]);
-
-    return (
-        <div className="card">
-            <h3>Weekly Overview</h3>
-            <div className="week-view-container">
-                {weekData.map(({ date, logs }) => (
-                    <div key={date.toISOString()} className="week-day-column">
-                        <div className="week-day-header">
-                            <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                            <div>{date.toLocaleDateString('en-US', { day: 'numeric' })}</div>
-                        </div>
-                        <div className="week-day-timeline">
-                             {logs.map(log => {
-                                const startMinutes = timeToMinutes(log.start_time) - (WORK_START_HOUR * 60);
-                                const endMinutes = timeToMinutes(log.end_time) - (WORK_START_HOUR * 60);
-                                const top = (startMinutes / (TOTAL_HOURS * 60)) * 100;
-                                const height = ((endMinutes - startMinutes) / (TOTAL_HOURS * 60)) * 100;
-                                
-                                return (
-                                    <div key={log.id} className="week-event" style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }} title={taskMap.get(log.task_id)}>
-                                        {taskMap.get(log.task_id)}
-                                    </div>
-                                );
-                             })}
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {isModalOpen && <ItemForm fields={[
+                { name: 'title', label: 'Title', type: 'text', required: true },
+                { name: 'type', label: 'Type', type: 'text' },
+                { name: 'status', label: 'Status', type: 'select', options: ['Not Started', 'In Progress', 'Completed'], required: true },
+                { name: 'complexity', label: 'Complexity', type: 'select', options: [1,2,3,4,5], required: true },
+                { name: 'assigned_employee_id', label: 'Assign To', type: 'select', options: employees.map(e => ({ value: e.id, label: e.name })), isObjectOptions: true, required: false },
+            ]} item={currentItem} onSave={handleSave} onClose={() => setIsModalOpen(false)} title={currentItem?.id ? 'Edit Project' : 'Add Project'} />}
         </div>
     );
 };
 
-const GenericCrudView = ({ title, columns, data, onAdd, onUpdate, onDelete, AddEditFormComponent, sheetName, emptyState, ...restProps }) => {
+// --- GENERIC CRUD VIEW ---
+type FormField = {
+    name: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'textarea';
+    options?: (string | number)[] | { value: string | number; label: string }[];
+    isObjectOptions?: boolean;
+    required?: boolean;
+};
+
+interface ItemFormProps<T> {
+    fields: FormField[];
+    item: Partial<T> | null;
+    onSave: (item: Partial<T>) => void;
+    onClose: () => void;
+    title: string;
+}
+function ItemForm<T extends object>({ fields, item, onSave, onClose, title }: ItemFormProps<T>) {
+    const [formData, setFormData] = useState<Partial<T>>(item || {});
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        const fieldDef = fields.find(f => f.name === name);
+        const isNumeric = fieldDef?.type === 'number' || (e.target as HTMLInputElement).type === 'number';
+        const finalValue = isNumeric && value !== '' ? Number(value) : (value === '' && fieldDef?.required === false ? null : value);
+        setFormData(prev => ({ ...prev, [name]: finalValue }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave({ ...item, ...formData });
+    };
+
+    return (
+        <Modal title={title} onClose={onClose}>
+            <form onSubmit={handleSubmit}>
+                {fields.map(field => (
+                    <div className="form-group" key={field.name}>
+                        <label htmlFor={field.name}>{field.label}</label>
+                        {field.type === 'select' ? (
+                            <select id={field.name} name={field.name} value={(formData as any)[field.name] ?? ''} onChange={handleChange} required={field.required}>
+                                <option value="" disabled>{field.required === false ? 'None' : `Select ${field.label.toLowerCase()}`}</option>
+                                {field.required === false && <option value="">None</option>}
+                                {field.isObjectOptions ? 
+                                    (field.options as { value: string | number; label: string }[])?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>) :
+                                    (field.options as (string|number)[])?.map(opt => <option key={opt} value={opt}>{opt}</option>)
+                                }
+                            </select>
+                        ) : (
+                            <input type={field.type} id={field.name} name={field.name} value={(formData as any)[field.name] ?? ''} onChange={handleChange} required={field.required} />
+                        )}
+                    </div>
+                ))}
+                <div className="modal-actions">
+                    <button type="button" className="btn" onClick={onClose}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+interface GenericCrudViewProps<T extends { id: number; }> {
+    items: T[];
+    title: string;
+    itemFields: FormField[];
+    onSave: (item: Partial<T>) => Promise<void>;
+    onDelete: (id: number) => Promise<void>;
+    renderHeader: () => React.ReactNode;
+    renderRow: (item: T, actions: React.ReactNode) => React.ReactNode;
+}
+function GenericCrudView<T extends { id: number; }>({ items, title, itemFields, onSave, onDelete, renderHeader, renderRow }: GenericCrudViewProps<T>) {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentItem, setCurrentItem] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [currentItem, setCurrentItem] = useState<Partial<T> | null>(null);
 
-    const filteredData = useMemo(() => {
-        if (!searchTerm) return data;
-        return data.filter(item => 
-            Object.values(item).some(val => 
-                String(val).toLowerCase().includes(searchTerm.toLowerCase())
-            )
-        );
-    }, [data, searchTerm]);
-
-    const handleAddClick = () => {
-        setCurrentItem(null);
+    const handleAdd = () => {
+        setCurrentItem({});
         setIsModalOpen(true);
     };
-    
-    const handleEditClick = (item) => {
+
+    const handleEdit = (item: T) => {
         setCurrentItem(item);
         setIsModalOpen(true);
     };
-    
-    const handleSave = (itemData) => {
-        if (currentItem) {
-            onUpdate(itemData, sheetName);
-        } else {
-            onAdd(itemData, sheetName);
-        }
+
+    const handleSave = async (itemData: Partial<T>) => {
+        await onSave(itemData);
         setIsModalOpen(false);
     };
+    
+    const singleItemTitle = title.endsWith('s') ? title.slice(0, -1) : title;
 
     return (
-         <div className="table-container">
+        <div>
             <div className="page-header">
-                <div className="page-filters">
-                    <input 
-                        type="search" 
-                        placeholder={`Search ${title}...`} 
-                        value={searchTerm} 
-                        onChange={e => setSearchTerm(e.target.value)} 
-                        className="search-input"
-                    />
-                </div>
-                <div className="page-actions">
-                    <button className="btn btn-primary" onClick={handleAddClick}>
-                        <span className="material-icons">add</span> Add {title.slice(0,-1)}
-                    </button>
-                </div>
+                <h2>{title} ({items.length})</h2>
+                <button className="btn btn-primary" onClick={handleAdd}>
+                    <span className="material-icons">add</span> Add {singleItemTitle}
+                </button>
             </div>
-            {filteredData.length === 0 ? (
-                <EmptyState 
-                    icon={emptyState.icon}
-                    title={emptyState.title}
-                    message={emptyState.message}
-                    action={<button className="btn btn-primary" onClick={handleAddClick}>{emptyState.actionText}</button>}
-                />
+            {items.length > 0 ? (
+                <div className="table-container">
+                    <table>
+                        <thead>{renderHeader()}</thead>
+                        <tbody>
+                            {items.map(item => renderRow(item, (
+                                <div className="actions">
+                                    <button className="btn-icon" onClick={() => handleEdit(item)}><span className="material-icons">edit</span></button>
+                                    <button className="btn-icon" onClick={() => onDelete(item.id)}><span className="material-icons">delete</span></button>
+                                </div>
+                            )))}
+                        </tbody>
+                    </table>
+                </div>
             ) : (
-                <table>
-                    <thead>
-                        <tr>
-                            {columns.map(col => <th key={col.key}>{col.header}</th>)}
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredData.map(item => (
-                            <tr key={item.id}>
-                                {columns.map(col => <td key={col.key}>{col.render ? col.render(item) : item[col.key]}</td>)}
-                                <td>
-                                    <div className="actions">
-                                        <button className="btn-icon" aria-label={`Edit ${title}`} onClick={() => handleEditClick(item)}>
-                                            <span className="material-icons">edit</span>
-                                        </button>
-                                        <button className="btn-icon" aria-label={`Delete ${title}`} onClick={() => onDelete(item.id, sheetName)}>
-                                            <span className="material-icons" style={{color: 'var(--danger-color)'}}>delete</span>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <EmptyState
+                    icon="group_off"
+                    title={`No ${title} Found`}
+                    message={`Get started by adding the first ${singleItemTitle.toLowerCase()}.`}
+                    action={<button className="btn btn-primary" onClick={handleAdd}><span className="material-icons">add</span> Add {singleItemTitle}</button>}
+                />
             )}
-            {isModalOpen && (
-                <Modal title={currentItem ? `Edit ${title.slice(0,-1)}` : `Add New ${title.slice(0,-1)}`} onClose={() => setIsModalOpen(false)}>
-                    <AddEditFormComponent item={currentItem} onSave={handleSave} onCancel={() => setIsModalOpen(false)} {...restProps} />
-                </Modal>
-            )}
+            {isModalOpen && <ItemForm fields={itemFields} item={currentItem} onSave={handleSave} onClose={() => setIsModalOpen(false)} title={currentItem?.id ? `Edit ${singleItemTitle}` : `Add ${singleItemTitle}`} />}
         </div>
     );
 };
 
-
-// --- FORMS for CRUD Views ---
-
-const EmployeeForm = ({ item, onSave, onCancel, teams, roles }) => {
-    const [formData, setFormData] = useState(item || { name: '', role: '', team: '', weekly_capacity_hours: 40 });
-    const handleChange = (e) => setFormData(p => ({...p, [e.target.name]: e.target.value}));
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSave({ ...formData, id: item?.id || Date.now(), weekly_capacity_hours: parseInt(formData.weekly_capacity_hours) });
+// --- LAYOUT COMPONENTS ---
+interface SidebarProps {
+    currentPage: Page;
+    setCurrentPage: (page: Page) => void;
+    isCollapsed: boolean;
+}
+const Sidebar = ({ currentPage, setCurrentPage, isCollapsed }: SidebarProps) => {
+    const pages = {
+        myday: { label: 'My Day', icon: 'today' },
+        projects: { label: 'Projects', icon: 'folder' },
+        insights: { label: 'Insights', icon: 'bar_chart' },
+        employees: { label: 'Employees', icon: 'people' },
     };
     return (
-        <form onSubmit={handleSubmit}>
-            <div className="form-group"><label>Name</label><input type="text" name="name" value={formData.name} onChange={handleChange} required/></div>
-            <div className="form-group">
-                <label>Role</label>
-                <input type="text" name="role" value={formData.role} onChange={handleChange} required list="roles-list" />
-                <datalist id="roles-list">
-                    {roles.map(role => <option key={role} value={role} />)}
-                </datalist>
+        <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+            <div className="sidebar-header">
+                <span className="material-icons">query_stats</span>
+                <span>TeamFlow</span>
             </div>
-            <div className="form-group">
-                <label>Team</label>
-                <input type="text" name="team" value={formData.team} onChange={handleChange} required list="teams-list" />
-                 <datalist id="teams-list">
-                    {teams.map(team => <option key={team} value={team} />)}
-                </datalist>
-            </div>
-            <div className="form-group"><label>Weekly Capacity (hrs)</label><input type="number" name="weekly_capacity_hours" value={formData.weekly_capacity_hours} onChange={handleChange} required/></div>
-            <div className="modal-actions"><button type="button" className="btn" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary">Save</button></div>
-        </form>
-    );
-};
-
-const TaskForm = ({ item, onSave, onCancel, employees, taskTypes, timeLogs, tasks }) => {
-    const [formData, setFormData] = useState(item || { title: '', type: '', complexity: 3, status: 'Not Started', assigned_employee_id: '' });
-    
-    const employeeSuggestions = useMemo(() => {
-        if (!employees.length) return [];
-
-        const taskTypeMap = new Map(tasks.map(t => [t.id, t.type]));
-
-        const employeeWorkload = employees.map(emp => {
-            const loggedHours = timeLogs
-                .filter(log => log.employee_id === emp.id)
-                .reduce((sum, log) => sum + calculateDuration(log.start_time, log.end_time), 0);
-            
-            const utilization = emp.weekly_capacity_hours > 0 ? (loggedHours / emp.weekly_capacity_hours) * 100 : 0;
-
-            const pastTaskTypes = new Set(
-                timeLogs.filter(log => log.employee_id === emp.id)
-                .map(log => taskTypeMap.get(log.task_id))
-                .filter(Boolean)
-            );
-
-            // Scoring logic
-            const utilizationScore = Math.max(0, 100 - utilization); // Higher score for less utilization
-            let skillScore = 0;
-            if (formData.type && pastTaskTypes.has(formData.type)) {
-                skillScore = 50; // Bonus points for relevant experience
-            }
-            
-            return {
-                ...emp,
-                utilization,
-                score: utilizationScore + skillScore,
-            };
-        });
-
-        return employeeWorkload.sort((a, b) => b.score - a.score);
-    }, [employees, timeLogs, tasks, formData.type]);
-
-    const handleChange = (e) => setFormData(p => ({...p, [e.target.name]: e.target.value}));
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSave({ ...formData, id: item?.id || Date.now(), complexity: parseInt(formData.complexity), assigned_employee_id: formData.assigned_employee_id ? parseInt(formData.assigned_employee_id) : null });
-    };
-
-    const suggestedEmployees = employeeSuggestions.slice(0, 3);
-    const otherEmployees = employeeSuggestions.slice(3);
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <div className="form-group"><label>Title</label><input type="text" name="title" value={formData.title} onChange={handleChange} required/></div>
-            <div className="form-group">
-                <label>Type</label>
-                <input type="text" name="type" value={formData.type} onChange={handleChange} required list="task-types-list"/>
-                <datalist id="task-types-list">
-                    {taskTypes.map(type => <option key={type} value={type} />)}
-                </datalist>
-            </div>
-            <div className="form-group"><label>Complexity (1-5)</label><input type="number" name="complexity" min="1" max="5" value={formData.complexity} onChange={handleChange} required/></div>
-            <div className="form-group"><label>Status</label><select name="status" value={formData.status} onChange={handleChange} required><option>Not Started</option><option>In Progress</option><option>Completed</option></select></div>
-            <div className="form-group">
-                <label>Assign to</label>
-                <select name="assigned_employee_id" value={formData.assigned_employee_id || ''} onChange={handleChange}>
-                    <option value="">Unassigned</option>
-                    {suggestedEmployees.length > 0 && (
-                        <optgroup label="⭐ Suggested">
-                            {suggestedEmployees.map(e => (
-                                <option key={e.id} value={e.id}>
-                                    {e.name} ({e.utilization.toFixed(0)}% Utilized)
-                                </option>
-                            ))}
-                        </optgroup>
-                    )}
-                     {otherEmployees.length > 0 && (
-                        <optgroup label="Others">
-                            {otherEmployees.map(e => (
-                                <option key={e.id} value={e.id}>
-                                    {e.name} ({e.utilization.toFixed(0)}% Utilized)
-                                </option>
-                            ))}
-                        </optgroup>
-                     )}
-                </select>
-            </div>
-            <div className="modal-actions"><button type="button" className="btn" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary">Save</button></div>
-        </form>
-    );
-};
-
-const ActivityForm = ({ item, onSave, onCancel, tasks, employeeId, date }) => {
-    const [formData, setFormData] = useState(item || { task_title: '', start_time: '09:00', end_time: '10:00', notes: '' });
-    
-    useEffect(() => {
-        setFormData(item || { task_title: '', start_time: '09:00', end_time: '10:00', notes: '' });
-    }, [item]);
-
-    const handleChange = (e) => setFormData(p => ({...p, [e.target.name]: e.target.value}));
-    
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (calculateDuration(formData.start_time, formData.end_time) <= 0) {
-            alert("End time must be after start time.");
-            return;
-        }
-        onSave({
-            ...formData,
-            employee_id: employeeId,
-            date: date
-        });
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <div className="form-group">
-                <label>Task</label>
-                <input
-                    type="text"
-                    name="task_title"
-                    value={formData.task_title || ''}
-                    onChange={handleChange}
-                    required
-                    list="tasks-list"
-                    placeholder="Type or select a task"
-                />
-                <datalist id="tasks-list">
-                    {tasks.map(t => <option key={t.id} value={t.title} />)}
-                </datalist>
-            </div>
-            <div style={{display: 'flex', gap: '16px'}}>
-                <div className="form-group" style={{flex: 1}}><label>Start Time</label><input type="time" name="start_time" value={formData.start_time} onChange={handleChange} required/></div>
-                <div className="form-group" style={{flex: 1}}><label>End Time</label><input type="time" name="end_time" value={formData.end_time} onChange={handleChange} required/></div>
-            </div>
-            <div className="form-group"><label>Notes (Optional)</label><textarea name="notes" value={formData.notes || ''} onChange={handleChange} rows={3}></textarea></div>
-            <div className="modal-actions"><button type="button" className="btn" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary">Save</button></div>
-        </form>
-    );
-};
-
-const ThemeSettings = ({ currentThemeColor, onThemeColorChange, onClose }) => {
-    const popoverRef = useRef(null);
-    const themeColors = {
-        indigo: '#283593',
-        teal: '#00796B',
-        orange: '#E65100',
-        pink: '#C2185B',
-    };
-
-     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (popoverRef.current && !popoverRef.current.contains(event.target)) {
-                onClose();
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [popoverRef, onClose]);
-
-    return (
-        <div className="theme-settings-popover" ref={popoverRef}>
-            <strong>Theme Color</strong>
-            <div className="theme-colors">
-                {Object.entries(themeColors).map(([name, color]) => (
-                    <div 
-                        key={name}
-                        className={`theme-color-swatch ${currentThemeColor === color ? 'active' : ''}`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => onThemeColorChange(color)}
+            <nav className="nav">
+                {Object.entries(pages).map(([key, { label, icon }]) => (
+                    <NavItem
+                        key={key}
+                        icon={icon}
+                        label={label}
+                        active={currentPage === key}
+                        onClick={() => setCurrentPage(key as Page)}
                     />
                 ))}
-            </div>
-        </div>
+            </nav>
+        </aside>
     );
 };
 
+interface BottomNavProps {
+    currentPage: Page;
+    setCurrentPage: (page: Page) => void;
+}
+const BottomNav = ({ currentPage, setCurrentPage }: BottomNavProps) => {
+    const pages = {
+        myday: { label: 'My Day', icon: 'today' },
+        projects: { label: 'Projects', icon: 'folder' },
+        insights: { label: 'Insights', icon: 'bar_chart' },
+        employees: { label: 'Employees', icon: 'people' },
+    };
+    return (
+        <nav className="bottom-nav">
+             {Object.entries(pages).map(([key, { label, icon }]) => (
+                <BottomNavItem
+                    key={key}
+                    icon={icon}
+                    label={label}
+                    active={currentPage === key}
+                    onClick={() => setCurrentPage(key as Page)}
+                />
+            ))}
+        </nav>
+    );
+};
 
 // --- MAIN APP COMPONENT ---
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiPCP6UcfF_6p8YO3DetDdgRZF9QLnMzViCVTu2ZZX3urQhQhKTt2yRnv1hWpuINGN/exec";
+
 const App = () => {
-    const [page, setPage] = useState<Page>('dashboard');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const [currentPage, setCurrentPage] = useLocalStorage<Page>('currentPage', 'myday');
+    const [loggedInEmployeeId, setLoggedInEmployeeId] = useLocalStorage<number>('loggedInEmployeeId', 1);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [filters, setFilters] = useState({team: 'all'});
-    const [loggedInEmployeeId, setLoggedInEmployeeId] = useState<number | null>(null);
-
-    const [theme, setTheme] = useLocalStorage('theme', 'light');
-    const [primaryColor, setPrimaryColor] = useLocalStorage('primaryColor', '#283593');
-    const [showThemeSettings, setShowThemeSettings] = useState(false);
-
-    useEffect(() => {
-        document.body.className = theme === 'dark' ? 'dark-mode' : '';
-        document.documentElement.style.setProperty('--primary-color', primaryColor);
-        document.documentElement.style.setProperty('--accent-color', primaryColor);
-    }, [theme, primaryColor]);
-
     
-    const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1f5OBwtGiZi-u2Qp7PiWYlN7WsrxpAKHFJGei6w9PtaQ/edit?usp=sharing';
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2kNJ-z3hVQOWbqqxOQi8fHEPdxFnWCRljoWrNYfzXKUhZUoJM5cQ06R-nfUhiUXI/exec';
-
-    const showToast = useCallback((message: string, type: ToastType) => {
-        setToasts(prev => [...prev, { id: Date.now(), message, type }]);
+    const addToast = useCallback((message: string, toastType: ToastType) => {
+        setToasts(prev => [...prev, { id: Date.now(), message, type: toastType }]);
     }, []);
 
-    // --- Data Persistence ---
-    useEffect(() => {
-        try {
-            const storedEmployees = localStorage.getItem('employees');
-            if (storedEmployees) setEmployees(JSON.parse(storedEmployees));
-            const storedTasks = localStorage.getItem('tasks');
-            if (storedTasks) setTasks(JSON.parse(storedTasks));
-            const storedTimeLogs = localStorage.getItem('timeLogs');
-            if (storedTimeLogs) setTimeLogs(JSON.parse(storedTimeLogs));
-            
-            if (!storedEmployees) {
-                syncData();
-            }
-        } catch (error) {
-            console.error("Failed to load data from localStorage", error);
-            syncData();
-        }
-    }, []);
-
-    useEffect(() => {
-        if (employees.length > 0 && !loggedInEmployeeId) {
-            setLoggedInEmployeeId(employees[0].id);
-        }
-    }, [employees, loggedInEmployeeId]);
-
-
-    const saveData = (key, data) => {
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-        } catch (error) {
-            console.error(`Failed to save ${key} to localStorage`, error);
-        }
-    };
-    
-    // --- Data Syncing ---
-    const getExportUrlsFromSheetUrl = (url: string) => {
-        const match = url.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match || !match[1]) throw new Error("Invalid Google Sheet URL.");
-        const sheetId = match[1];
-        const baseUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=`;
-        return {
-            employees: `${baseUrl}Employees`,
-            tasks: `${baseUrl}Tasks`,
-            timeLogs: `${baseUrl}${encodeURIComponent('Time Logs')}`,
-        };
-    };
-
-    const parseCsv = (text: string): Record<string, string>[] => {
-        const lines = text.trim().split(/\r\n|\n/);
-        if (lines.length < 2) return [];
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        return lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-            return headers.reduce((obj, header, i) => {
-                obj[header] = values[i] || '';
-                return obj;
-            }, {});
-        });
-    };
-
-    const findValueByKey = (obj, key) => {
-        const keyToFind = key.toLowerCase();
-        const actualKey = Object.keys(obj).find(k => k.toLowerCase() === keyToFind);
-        return actualKey ? obj[actualKey] : undefined;
-    };
-
-    const syncData = async () => {
+    const apiCall = useCallback(async (body: object) => {
         setIsLoading(true);
-        try {
-            const urls = getExportUrlsFromSheetUrl(GOOGLE_SHEET_URL);
-            const [empRes, taskRes, logRes] = await Promise.all([fetch(urls.employees), fetch(urls.tasks), fetch(urls.timeLogs)]);
-            if (!empRes.ok || !taskRes.ok || !logRes.ok) throw new Error("Failed to fetch sheets. Check URL and sharing settings.");
-
-            const [empText, taskText, logText] = await Promise.all([empRes.text(), taskRes.text(), logRes.text()]);
-            
-            const newEmployees = parseCsv(empText).map(row => ({ 
-                id: parseInt(findValueByKey(row, 'id'), 10), 
-                name: findValueByKey(row, 'name') || '', 
-                role: findValueByKey(row, 'role') || '', 
-                team: findValueByKey(row, 'team') || '', 
-                weekly_capacity_hours: parseInt(findValueByKey(row, 'weekly_capacity_hours'), 10) || 40 
-            })).filter(e => !isNaN(e.id));
-
-            const newTasks = parseCsv(taskText).map(row => ({ 
-                id: parseInt(findValueByKey(row, 'id'), 10), 
-                title: findValueByKey(row, 'title') || '', 
-                type: findValueByKey(row, 'type') || '', 
-                complexity: parseInt(findValueByKey(row, 'complexity'), 10) || 3, 
-                status: findValueByKey(row, 'status') || 'Not Started', 
-                assigned_employee_id: findValueByKey(row, 'assigned_employee_id') ? parseInt(findValueByKey(row, 'assigned_employee_id'), 10) : null 
-            })).filter(t => !isNaN(t.id));
-
-            const newTimeLogs = parseCsv(logText).map((row) => ({ 
-                id: parseInt(findValueByKey(row, 'id'), 10), 
-                employee_id: parseInt(findValueByKey(row, 'employee_id'), 10), 
-                task_id: parseInt(findValueByKey(row, 'task_id'), 10), 
-                date: findValueByKey(row, 'date') || '',
-                start_time: findValueByKey(row, 'start_time') || '00:00',
-                end_time: findValueByKey(row, 'end_time') || '00:00',
-                notes: findValueByKey(row, 'notes') || '',
-            })).filter(l => !isNaN(l.id));
-
-            setEmployees(newEmployees); saveData('employees', newEmployees);
-            setTasks(newTasks); saveData('tasks', newTasks);
-            setTimeLogs(newTimeLogs); saveData('timeLogs', newTimeLogs);
-            showToast("Data synced successfully!", 'success');
-        } catch (error) {
-            console.error("Sync failed:", error);
-            showToast(`Error syncing data: ${error.message}`, 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const postDataToSheet = async (payload) => {
-        if (!APPS_SCRIPT_URL) {
-            console.error('Google Apps Script URL is not set.');
-            showToast('Application is not configured to save data.', 'error');
-            return false;
-        }
         try {
             const response = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                mode: 'cors', body: JSON.stringify(payload), redirect: 'follow',
+                body: JSON.stringify(body),
+                redirect: 'follow'
             });
-
-            const resultText = await response.text();
-            let result;
-            try { result = JSON.parse(resultText); } catch (e) { throw new Error('Received an invalid response from the server.'); }
-
-            if (result.status === 'success') return true;
-            else throw new Error(result.message || 'Unknown error from Apps Script.');
-        } catch (error) {
-            console.error('Failed to post data to Google Sheet:', error);
-            showToast(`Sync to sheet failed: ${error.message}`, 'error');
-            return false;
-        }
-    };
-    
-    const createCrudHandlers = (state, setState, stateKey) => ({
-        onAdd: async (item, sheetName) => {
-            const originalState = [...state];
-            const optimisticState = [...originalState, item];
-            setState(optimisticState); saveData(stateKey, optimisticState);
-            const success = await postDataToSheet({ action: 'CREATE', sheetName, rowData: item });
-            if (success) { showToast('Item added successfully.', 'success'); } 
-            else { setState(originalState); saveData(stateKey, originalState); showToast('Failed to add item. Sync failed, change reverted.', 'error'); }
-        },
-        onUpdate: async (updatedItem, sheetName) => {
-            const originalState = [...state];
-            const optimisticState = originalState.map(i => i.id === updatedItem.id ? updatedItem : i);
-            setState(optimisticState); saveData(stateKey, optimisticState);
-            const success = await postDataToSheet({ action: 'UPDATE', sheetName, rowId: updatedItem.id, rowData: updatedItem });
-            if (success) { showToast('Item updated successfully.', 'success'); } 
-            else { setState(originalState); saveData(stateKey, originalState); showToast('Update failed to sync. Changes reverted.', 'error'); }
-        },
-        onDelete: async (id, sheetName) => { 
-            if (window.confirm('Are you sure? This will be permanently deleted from the app and the Google Sheet.')) {
-                const originalState = [...state];
-                const optimisticState = originalState.filter(i => i.id !== id);
-                setState(optimisticState); saveData(stateKey, optimisticState);
-                const success = await postDataToSheet({ action: 'DELETE', sheetName, rowId: id });
-                if (success) { showToast('Item deleted successfully.', 'success'); } 
-                else { setState(originalState); saveData(stateKey, originalState); showToast('Deletion failed to sync. Change reverted.', 'error'); }
-            }
-        },
-    });
-
-    const handleEmployeeDelete = useCallback(async (employeeId) => {
-        const employeeToDelete = employees.find(e => e.id === employeeId);
-        if (!employeeToDelete) return;
-
-        const confirmMessage = `Are you sure you want to delete ${employeeToDelete.name}? This will also delete all their time logs and unassign them from any tasks.`;
-        if (!window.confirm(confirmMessage)) return;
-
-        const originalEmployees = [...employees]; const originalTasks = [...tasks]; const originalTimeLogs = [...timeLogs];
-        const newEmployees = employees.filter(e => e.id !== employeeId);
-        const newTasks = tasks.map(task => task.assigned_employee_id === employeeId ? { ...task, assigned_employee_id: null } : task );
-        const newTimeLogs = timeLogs.filter(log => log.employee_id !== employeeId);
-        
-        setEmployees(newEmployees); setTasks(newTasks); setTimeLogs(newTimeLogs);
-        saveData('employees', newEmployees); saveData('tasks', newTasks); saveData('timeLogs', newTimeLogs);
-
-        const actions = [
-            { action: 'DELETE', sheetName: 'Employees', rowId: employeeId },
-            ...tasks.filter(t => t.assigned_employee_id === employeeId).map(t => ({ action: 'UPDATE', sheetName: 'Tasks', rowId: t.id, rowData: { ...t, assigned_employee_id: null } })),
-            ...timeLogs.filter(l => l.employee_id === employeeId).map(l => ({ action: 'DELETE', sheetName: 'Time Logs', rowId: l.id }))
-        ];
-
-        try {
-            const results = await Promise.all(actions.map(action => postDataToSheet(action)));
-            if (results.some(success => !success)) throw new Error("One or more sync operations failed.");
-            showToast('Employee and all related data deleted successfully.', 'success');
-        } catch (error) {
-            setEmployees(originalEmployees); setTasks(originalTasks); setTimeLogs(originalTimeLogs);
-            saveData('employees', originalEmployees); saveData('tasks', originalTasks); saveData('timeLogs', originalTimeLogs);
-            showToast('Deletion failed. Changes have been reverted.', 'error');
-        }
-    }, [employees, tasks, timeLogs, showToast]);
-
-    const handleTaskDelete = useCallback(async (taskId) => {
-        const taskToDelete = tasks.find(t => t.id === taskId);
-        if (!taskToDelete) return;
-        if (!window.confirm(`Are you sure you want to delete the task "${taskToDelete.title}"? This will also delete all its associated time logs.`)) return;
-        
-        const originalTasks = [...tasks]; const originalTimeLogs = [...timeLogs];
-        const newTasks = tasks.filter(t => t.id !== taskId);
-        const newTimeLogs = timeLogs.filter(log => log.task_id !== taskId);
-
-        setTasks(newTasks); setTimeLogs(newTimeLogs);
-        saveData('tasks', newTasks); saveData('timeLogs', newTimeLogs);
-        
-        const actions = [
-            { action: 'DELETE', sheetName: 'Tasks', rowId: taskId },
-            ...timeLogs.filter(l => l.task_id === taskId).map(l => ({ action: 'DELETE', sheetName: 'Time Logs', rowId: l.id }))
-        ];
-        
-        try {
-            const results = await Promise.all(actions.map(action => postDataToSheet(action)));
-            if (results.some(success => !success)) throw new Error("One or more sync operations failed.");
-            showToast('Task and its time logs deleted successfully.', 'success');
-        } catch (error) {
-            setTasks(originalTasks); setTimeLogs(originalTimeLogs);
-            saveData('tasks', originalTasks); saveData('timeLogs', originalTimeLogs);
-            showToast('Deletion failed. Changes have been reverted.', 'error');
-        }
-    }, [tasks, timeLogs, showToast]);
-    
-    const timeLogHandlers = useMemo(() => createCrudHandlers(timeLogs, setTimeLogs, 'timeLogs'), [timeLogs]);
-
-    const handleActivitySave = useCallback(async (activityData) => {
-        const { task_title, ...restOfActivity } = activityData;
-        if (!task_title || !task_title.trim()) {
-            showToast('Task name is required.', 'error');
-            return;
-        }
-        const trimmedTitle = task_title.trim();
-    
-        let task = tasks.find(t => t.title.toLowerCase() === trimmedTitle.toLowerCase());
-        let taskId;
-    
-        if (!task) {
-            const newTask = { 
-                id: Date.now(), 
-                title: trimmedTitle, 
-                type: 'General', 
-                complexity: 1, 
-                status: 'In Progress' as TaskStatus, 
-                assigned_employee_id: activityData.employee_id 
-            };
-            taskId = newTask.id;
             
-            const originalTasks = [...tasks];
-            const newTasks = [...originalTasks, newTask];
-            setTasks(newTasks);
-            saveData('tasks', newTasks);
-            const taskSaveSuccess = await postDataToSheet({ action: 'CREATE', sheetName: 'Tasks', rowData: newTask });
-    
-            if (!taskSaveSuccess) {
-                setTasks(originalTasks);
-                saveData('tasks', originalTasks);
-                showToast('Failed to create new task. Activity not saved.', 'error');
-                return;
+            const textContent = await response.text();
+            let data;
+            try {
+                 data = JSON.parse(textContent);
+            } catch (parseError) {
+                console.error("Failed to parse server response:", textContent);
+                throw new Error("The server returned an invalid response. Check the Apps Script logs for errors.");
             }
-            showToast(`New task "${trimmedTitle}" created.`, 'success');
-        } else {
-            taskId = task.id;
+
+            if (data.status === 'error') {
+                throw new Error(data.message);
+            }
+            return data;
+        } finally {
+            setIsLoading(false);
         }
-    
-        const finalTimeLog = { ...restOfActivity, task_id: taskId };
-        delete finalTimeLog.task_title;
-    
-        if (finalTimeLog.id && timeLogs.some(log => log.id === finalTimeLog.id)) {
-            await timeLogHandlers.onUpdate(finalTimeLog, "Time Logs");
-        } else {
-            finalTimeLog.id = finalTimeLog.id || Date.now();
-            await timeLogHandlers.onAdd(finalTimeLog, "Time Logs");
+    }, []);
+
+    const fetchAllData = useCallback(async () => {
+        setError(null);
+        try {
+            const data = await apiCall({ action: 'readAll' });
+            setEmployees(data.employees || []);
+            setTasks(data.tasks || []);
+            setTimeLogs(data.timeLogs || []);
+            addToast('Data successfully synced from Google Sheet!', 'success');
+        } catch (err: any) {
+            setError(`Failed to load data: ${err.message}. Please check the Google Apps Script configuration and your internet connection.`);
+            addToast('Failed to sync data', 'error');
+            console.error(err);
         }
-    }, [tasks, timeLogs, showToast, timeLogHandlers, setTasks]);
+    }, [apiCall, addToast]);
 
-    const { onAdd: onEmployeeAdd, onUpdate: onEmployeeUpdate } = useMemo(() => createCrudHandlers(employees, setEmployees, 'employees'), [employees]);
-    const { onAdd: onTaskAdd, onUpdate: onTaskUpdate } = useMemo(() => createCrudHandlers(tasks, setTasks, 'tasks'), [tasks]);
+    useEffect(() => {
+        fetchAllData();
+    }, [fetchAllData]);
 
-    const employeeCrud = { onAdd: onEmployeeAdd, onUpdate: onEmployeeUpdate, onDelete: handleEmployeeDelete };
-    const taskCrud = { onAdd: onTaskAdd, onUpdate: onTaskUpdate, onDelete: handleTaskDelete };
-    const timeLogCrud = { onAdd: handleActivitySave, onUpdate: handleActivitySave, onDelete: timeLogHandlers.onDelete };
-    
-    const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.name])), [employees]);
-    const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t.title])), [tasks]);
+    const handleSave = useCallback(async (sheetName: string, item: Partial<Employee | Task | TimeLog>) => {
+        const action = item.id ? 'update' : 'create';
+        try {
+            await apiCall({ action, sheetName, payload: item });
+            addToast(`${sheetName.slice(0, -1)} ${action}d successfully`, 'success');
+            await fetchAllData();
+        } catch (err: any) {
+            addToast(`Failed to save ${sheetName.slice(0, -1)}: ${err.message}`, 'error');
+        }
+    }, [apiCall, fetchAllData, addToast]);
 
-    const employeeColumns = useMemo(() => [ {key: 'name', header: 'Name'}, {key: 'role', header: 'Role'}, {key: 'team', header: 'Team'}, {key: 'weekly_capacity_hours', header: 'Capacity (hrs)'} ], []);
-    const taskColumns = useMemo(() => [ {key: 'title', header: 'Title'}, {key: 'type', header: 'Type'}, {key: 'complexity', header: 'Complexity'}, {key: 'status', header: 'Status'}, {key: 'assigned_employee_id', header: 'Assigned To', render: (item) => employeeMap.get(item.assigned_employee_id) || 'Unassigned'} ], [employeeMap]);
-    const timeLogColumns = useMemo(() => [ {key: 'employee_id', header: 'Employee', render: (item) => employeeMap.get(item.employee_id) || 'Unknown'}, {key: 'task_id', header: 'Task', render: (item) => taskMap.get(item.task_id) || 'Unknown'}, {key: 'date', header: 'Date'}, {key: 'start_time', header: 'Start'}, {key: 'end_time', header: 'End'}, {key: 'duration', header: 'Duration', render: (item) => `${calculateDuration(item.start_time, item.end_time).toFixed(2)} hrs`} ], [employeeMap, taskMap]);
-    
-    const timeLogsWithTaskTitles = useMemo(() => timeLogs.map(log => ({...log, task_title: taskMap.get(log.task_id) || ''})), [timeLogs, taskMap]);
+    const handleDelete = useCallback(async (sheetName: string, id: number) => {
+        try {
+            await apiCall({ action: 'delete', sheetName, payload: { id } });
+            addToast(`${sheetName.slice(0, -1)} deleted`, 'success');
+            await fetchAllData();
+        } catch (err: any) {
+            addToast(`Failed to delete ${sheetName.slice(0, -1)}: ${err.message}`, 'error');
+        }
+    }, [apiCall, fetchAllData, addToast]);
 
-    const teams = useMemo(() => [...new Set(employees.map(e => e.team).filter(Boolean))], [employees]);
-    const roles = useMemo(() => [...new Set(employees.map(e => e.role).filter(Boolean))], [employees]);
-    const taskTypes = useMemo(() => [...new Set(tasks.map(t => t.type).filter(Boolean))], [tasks]);
+    const teams = useMemo(() => Array.from(new Set(employees.map(e => e.team).filter(Boolean))), [employees]);
+    const loggedInUser = employees.find(e => e.id === loggedInEmployeeId);
 
-    const AddEditEmployeeForm = useCallback((props) => <EmployeeForm {...props} teams={teams} roles={roles} />, [teams, roles]);
-    const AddEditTaskForm = useCallback((props) => <TaskForm {...props} employees={employees} taskTypes={taskTypes} timeLogs={timeLogs} tasks={tasks} />, [employees, taskTypes, timeLogs, tasks]);
-    const AddEditActivityForm = useCallback((props) => <ActivityForm {...props} tasks={tasks} employeeId={loggedInEmployeeId} date={new Date().toISOString().split('T')[0]} />, [tasks, loggedInEmployeeId]);
-
-    const handleEmployeeSelect = (employeeId) => {
-        setLoggedInEmployeeId(employeeId);
-        setPage('myday');
+    const pages: Record<Page, { title: string, component: React.ReactNode }> = {
+        myday: { title: `My Day${loggedInUser ? ` - ${loggedInUser.name}` : ''}`, component: <MyDayView loggedInEmployeeId={loggedInEmployeeId} timeLogs={timeLogs} tasks={tasks} onSave={(item) => handleSave('TimeLogs', item)} onDelete={(id) => handleDelete('TimeLogs', id)} /> },
+        projects: { title: 'Projects', component: <ProjectsView tasks={tasks} employees={employees} timeLogs={timeLogs} onSave={(item) => handleSave('Tasks', item)} onDelete={(id) => handleDelete('Tasks', id)} /> },
+        insights: { title: 'Team Insights', component: <InsightsView employees={employees} timeLogs={timeLogs} tasks={tasks} teams={teams} onEmployeeSelect={id => {setLoggedInEmployeeId(id); setCurrentPage('myday');}} /> },
+        employees: { title: 'Employees', component: <GenericCrudView<Employee>
+            items={employees}
+            title="Employees"
+            itemFields={[
+                { name: 'name', label: 'Name', type: 'text', required: true },
+                { name: 'role', label: 'Role', type: 'text', required: true },
+                { name: 'team', label: 'Team', type: 'text', required: true },
+                { name: 'weekly_capacity_hours', label: 'Weekly Capacity (hrs)', type: 'number', required: true },
+            ]}
+            onSave={(item) => handleSave('Employees', item)}
+            onDelete={(id) => handleDelete('Employees', id)}
+            renderHeader={() => (
+                 <tr><th>Name</th><th>Role</th><th>Team</th><th>Capacity (hrs)</th><th>Actions</th></tr>
+            )}
+            renderRow={(item, actions) => (
+                <tr key={item.id}>
+                    <td>{item.name}</td>
+                    <td>{item.role}</td>
+                    <td>{item.team}</td>
+                    <td>{item.weekly_capacity_hours}</td>
+                    <td>{actions}</td>
+                </tr>
+            )}
+        /> },
     };
-    
-    const pageTitles = { dashboard: 'Dashboard Overview', myday: 'My Day', workload: 'Workload Analysis', employees: 'Employees', timelogs: 'All Time Logs', tasks: 'Task Management' };
-    const emptyStates = {
-        employees: { icon: 'groups', title: 'No Employees Found', message: "You haven't added any employees yet. Let's add the first one!", actionText: "Add Employee" },
-        tasks: { icon: 'list_alt', title: 'No Tasks Found', message: "Create your first task to start tracking work.", actionText: "Add Task" },
-        timelogs: { icon: 'schedule', title: 'No Time Logs Found', message: "Time logs will appear here once employees start logging their activities.", actionText: "Log Activity" },
-    };
+
+    const currentPageData = pages[currentPage];
     
     return (
-        <>
+        <div className="app-container">
             <style>{GlobalStyles}</style>
+            {isLoading && <div className="loading-overlay">Syncing with Google Sheets...</div>}
             <ToastNotifications toasts={toasts} setToasts={setToasts} />
-            <div className="app-container">
-                <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} aria-label="Toggle sidebar">
-                    <span className="material-icons">{isSidebarCollapsed ? 'menu' : 'close'}</span>
+            
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} isCollapsed={sidebarCollapsed} />
+            <main className="main-content" style={{ paddingLeft: sidebarCollapsed ? '32px' : 'calc(var(--sidebar-width) + 32px)' }}>
+                <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} style={{ left: sidebarCollapsed ? '10px' : 'calc(var(--sidebar-width) - 50px)' }}>
+                    <span className="material-icons">{sidebarCollapsed ? 'menu' : 'close'}</span>
                 </button>
-                <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-                    <div className="sidebar-header"><span className="material-icons">assessment</span><span>Tracker</span></div>
-                    <nav className="nav" role="navigation" aria-label="Main">
-                        <NavItem icon="dashboard" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
-                        <NavItem icon="today" label="My Day" active={page === 'myday'} onClick={() => setPage('myday')} />
-                        <NavItem icon="bar_chart" label="Workload" active={page === 'workload'} onClick={() => setPage('workload')} />
-                        <NavItem icon="groups" label="Employees" active={page === 'employees'} onClick={() => setPage('employees')} />
-                        <NavItem icon="list_alt" label="Tasks" active={page === 'tasks'} onClick={() => setPage('tasks')} />
-                        <NavItem icon="schedule" label="All Time Logs" active={page === 'timelogs'} onClick={() => setPage('timelogs')} />
-                    </nav>
-                </aside>
-                <main className="main-content">
-                    {isLoading && <div className="loading-overlay">Syncing data...</div>}
-                    <header className="header">
-                        <h1 style={{marginLeft: isSidebarCollapsed ? '50px' : '0'}}>{pageTitles[page]}</h1>
-                        <div className="header-actions">
-                            {employees.length > 0 && (
-                                <div className="user-switcher">
-                                    <label htmlFor="user-select">Log In As:</label>
-                                    <select id="user-select" value={loggedInEmployeeId || ''} onChange={(e) => setLoggedInEmployeeId(Number(e.target.value))}>
-                                        {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-                                    </select>
-                                </div>
-                            )}
-                            <button className="btn" onClick={syncData} disabled={isLoading}><span className="material-icons">sync</span> Sync Data</button>
-                             <button className="btn-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle dark mode">
-                                <span className="material-icons">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
-                            </button>
-                             <div style={{ position: 'relative' }}>
-                                <button className="btn-icon" onClick={() => setShowThemeSettings(s => !s)} aria-label="Theme settings">
-                                    <span className="material-icons">palette</span>
-                                </button>
-                                {showThemeSettings && <ThemeSettings currentThemeColor={primaryColor} onThemeColorChange={setPrimaryColor} onClose={() => setShowThemeSettings(false)}/>}
-                            </div>
+                <div className="header">
+                    <h1 style={{ marginLeft: sidebarCollapsed ? '40px' : '0' }}>{currentPageData.title}</h1>
+                    <div className="header-actions">
+                         <button className="btn" onClick={fetchAllData}>
+                            <span className="material-icons">refresh</span> Refresh Data
+                        </button>
+                        <div className="user-switcher">
+                            <label>Viewing As:</label>
+                            <select value={loggedInEmployeeId} onChange={e => setLoggedInEmployeeId(parseInt(e.target.value))}>
+                                {employees.length > 0 ? employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>) : <option>Loading...</option>}
+                            </select>
                         </div>
-                    </header>
-                    {page === 'dashboard' && <DashboardView employees={employees} timeLogs={timeLogs} teams={teams} filters={filters} setFilters={setFilters} />}
-                    {page === 'myday' && loggedInEmployeeId && <MyDayView loggedInEmployeeId={loggedInEmployeeId} timeLogs={timeLogs} tasks={tasks} onSave={handleActivitySave} onDelete={timeLogHandlers.onDelete} />}
-                    {page === 'workload' && <WorkloadView employees={employees} timeLogs={timeLogs} onEmployeeSelect={handleEmployeeSelect} />}
-                    {page === 'employees' && <GenericCrudView title="Employees" data={employees} {...employeeCrud} sheetName="Employees" AddEditFormComponent={AddEditEmployeeForm} columns={employeeColumns} emptyState={emptyStates.employees} />}
-                    {page === 'tasks' && <GenericCrudView title="Tasks" data={tasks} {...taskCrud} sheetName="Tasks" AddEditFormComponent={AddEditTaskForm} columns={taskColumns} emptyState={emptyStates.tasks} timeLogs={timeLogs} tasks={tasks} employees={employees}/>}
-                    {page === 'timelogs' && <GenericCrudView title="Time Logs" data={timeLogsWithTaskTitles} {...timeLogCrud} sheetName="Time Logs" AddEditFormComponent={AddEditActivityForm} columns={timeLogColumns} emptyState={emptyStates.timelogs} />}
-                </main>
-                 <nav className="bottom-nav">
-                    <BottomNavItem icon="dashboard" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
-                    <BottomNavItem icon="today" label="My Day" active={page === 'myday'} onClick={() => setPage('myday')} />
-                    <BottomNavItem icon="bar_chart" label="Workload" active={page === 'workload'} onClick={() => setPage('workload')} />
-                    <BottomNavItem icon="groups" label="Employees" active={page === 'employees'} onClick={() => setPage('employees')} />
-                    <BottomNavItem icon="list_alt" label="Tasks" active={page === 'tasks'} onClick={() => setPage('tasks')} />
-                </nav>
-            </div>
-        </>
+                    </div>
+                </div>
+                {error && <div className="toast toast-error" style={{marginBottom: '16px'}}>{error}</div>}
+                {currentPageData.component}
+            </main>
+            <BottomNav currentPage={currentPage} setCurrentPage={setCurrentPage} />
+        </div>
     );
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<App />);
+root.render(<React.StrictMode><App /></React.StrictMode>);
